@@ -104,6 +104,67 @@ Assets de marca (se as artes em `branding/` mudarem):
 python3 tools/make_branding.py
 ```
 
+## Segurança
+
+**Leitura é pública por design** (a loja, o OTA e a ajuda do dispositivo não
+autenticam). **Escrita só com token** — `POST/DELETE /admin/*` exigem
+`Authorization: Bearer <token>` e **escopo**:
+
+| escopo    | permite                          | para quem              |
+|-----------|----------------------------------|------------------------|
+| `*`       | tudo                             | você (root)            |
+| `apps`    | publicar/remover apps da loja    | colaboradores          |
+| `updates` | publicar firmware nos canais OTA | CI / publicador de fw  |
+
+Credenciais vivem em **Docker secrets** (nunca em environment/commit):
+
+```bash
+# root (acesso total, retrocompativel):
+printf 'SEU-TOKEN-FORTE' | docker secret create celeros_hub_admin_token -
+
+# tokens nomeados (cada um com escopo; o nome aparece no log de auditoria):
+python3 tools/make_tokens.py > tokens.json     # gera; edite nomes a gosto
+docker secret create celeros_hub_tokens < tokens.json && shred -u tokens.json
+```
+
+Sem nenhum secret configurado, o `/admin` fica **desabilitado** (503). Rotação
+e revogação são por token: gere um JSON novo e recrie o secret `celeros_hub_tokens`
++ `denv update` (secrets são imutáveis no Swarm; o hub relê o arquivo a cada
+request, sem restart do processo). `GET /admin/whoami` confere nome/escopos de
+um token — útil no CI.
+
+**Demais camadas:**
+
+- **Rate limit de falhas de auth** por IP (10 erros em 10 min → bloqueio de
+  15 min). Confia no `X-Forwarded-For` do Traefik porque o container não tem
+  porta publicada no host — só o reverse proxy o alcança.
+- **Auditoria append-only** em `/mnt/nfs/celeros-hub/audit/audit.log` (fora do
+  rsync de propósito): ts, IP, nome do token, ação, alvo, sucesso/falha —
+  incluindo tentativas de auth.
+- **Anti-rollback OTA**: publicar versão *menor* que a atual do canal retorna
+  409 (`--force` na CLI para exceção consciente).
+- **Integridade do firmware**: o publish grava `firmware_sha256` no
+  `update.json` (campo extra; firmware atual ignora — verificação no
+  dispositivo fica como evolução, junto com CA pinning no `esp_https_ota`,
+  que hoje roda `setInsecure`).
+- **Uploads**: teto por request e do total descomprimido do zip (anti
+  zip-bomb), whitelist de arquivos do pacote, checagem de magic bytes do PNG,
+  validação de `packageName`/semver/canal (sem path traversal).
+- **Superfície**: `/api/docs` (Swagger) desligado em produção
+  (`HUB_DOCS=1` em dev); TLS termina no Traefik (entrypoint `websecure`).
+
+**CI (exemplo GitHub Actions)** — token com escopo `updates` no secret
+`CELER_HUB_TOKEN` do repo:
+
+```yaml
+- name: Publicar OTA
+  run: |
+    python3 CelerOS-Server/tools/publish_firmware.py esp32 \
+      build-cyd/KryonOS.bin --version ${{ steps.ver.outputs.v }} \
+      --changelog "${{ github.event.head_commit.message }}" \
+      --hub https://os.celer.tec.br --token ${{ secrets.CELER_HUB_TOKEN }}
+```
+
 ## Contratos servidos (compatibilidade com o firmware)
 
 - **Loja** (cliente: `data/apps/App Store/main.js`): `index.json`

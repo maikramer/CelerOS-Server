@@ -44,6 +44,9 @@ def main() -> None:
     ap.add_argument("--major", action="store_true")
     ap.add_argument("--minor", action="store_true")
     ap.add_argument("--security", action="store_true")
+    ap.add_argument("--force", action="store_true",
+                    help="permite publicar versao MENOR que a atual do canal "
+                         "(o servidor bloqueia rollback por padrao)")
     ap.add_argument("--api-version", type=int, default=2)
     ap.add_argument("--hub", default=os.environ.get("CELER_HUB", "https://os.celer.tec.br"))
     ap.add_argument("--token", default=os.environ.get("CELER_HUB_TOKEN", ""))
@@ -88,6 +91,11 @@ def main() -> None:
             "filename=\"firmware.bin\"\r\n"
             "Content-Type: application/octet-stream\r\n\r\n".encode()
             + bin_blob + b"\r\n")
+    if args.force:
+        parts.append(
+            f"--{boundary}\r\n"
+            "Content-Disposition: form-data; name=\"force\"\r\n\r\n"
+            "1\r\n".encode())
     parts.append(
         f"--{boundary}\r\n"
         "Content-Disposition: form-data; name=\"update.json\"\r\n"
@@ -113,6 +121,8 @@ def main() -> None:
 
     fw = "com firmware.bin" if out.get("firmware") else "só manifest (sem INSTALL)"
     print(f"ok: canal {out.get('channel')} v{out.get('version')} publicado ({fw})")
+    if out.get("sha256"):
+        print(f"    sha256 {out['sha256']}")
     print(f"    {out.get('url')}")
 
 

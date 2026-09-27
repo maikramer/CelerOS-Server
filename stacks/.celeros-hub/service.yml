@@ -80,6 +80,7 @@ sync:
   auto_create_dirs: true
   required_dirs:
     - "content"
+    - "audit"
   files:
     - $common_files.docker_compose
     - $common_files.env_file

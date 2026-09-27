@@ -42,10 +42,16 @@ services:
       # absoluta; em teste local sobrepasse com http://...).
       - BASE_URL=https://os.celer.tec.br
       - CONTENT_DIR=/data/content
-      - HUB_VERSION=0.1.0
-      # Token admin vem de secret (criado a parte; NUNCA em environment):
-      #   printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -
+      - AUDIT_DIR=/data/audit
+      - HUB_VERSION=0.2.0
+      # Tokens da area admin vem de secrets (NUNCA em environment):
+      #   root (acesso total):
+      #     printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -
+      #   tokens nomeados c/ escopo (apps|updates|*), p/ pessoas e CI:
+      #     docker secret create celeros_hub_tokens < tokens.json
+      #     (tools/make_tokens.py gera o JSON)
       - HUB_ADMIN_TOKEN_FILE=/run/secrets/celeros_hub_admin_token
+      - HUB_TOKENS_FILE=/run/secrets/celeros_hub_tokens
 
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
@@ -57,10 +63,14 @@ services:
     volumes:
       # Conteudo do hub (loja/updates/help/portal) — rw para a API admin.
       - /mnt/nfs/celeros-hub/content:/data/content
+      # Auditoria (append-only; fora do rsync do content de proposito).
+      - /mnt/nfs/celeros-hub/audit:/data/audit
 
     secrets:
       - source: celeros_hub_admin_token
         target: celeros_hub_admin_token
+      - source: celeros_hub_tokens
+        target: celeros_hub_tokens
 
     networks:
       - traefik-public
@@ -87,11 +97,15 @@ services:
 
     <<: *logging
 
-# Token da area admin (publicar apps/firmware). Crie ANTES do deploy:
+# Credenciais da area admin (publicar apps/firmware). Crie ANTES do deploy:
 #   printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -
+#   docker secret create celeros_hub_tokens < tokens.json   # tools/make_tokens.py
 secrets:
   celeros_hub_admin_token:
     name: celeros_hub_admin_token
+    external: true
+  celeros_hub_tokens:
+    name: celeros_hub_tokens
     external: true
 
 networks:
