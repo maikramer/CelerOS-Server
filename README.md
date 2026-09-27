@@ -59,11 +59,14 @@ Registro único (stack externa — o repo é a aplicação):
 denv external add ~/GitClones/CelerOS-Server
 ```
 
-Secret do token admin (uma vez, no Swarm):
+Credenciais: a pasta local `env/` (gitignored) guarda root + tokens nomeados
+e o `env/README.md` mostra como criar os secrets a partir dela
+(`celeros_hub_admin_token` e `celeros_hub_tokens`).
 
-```bash
-printf 'SEU-TOKEN-FORTE' | docker secret create celeros_hub_admin_token -
-```
+DNS (uma vez, no Cloudflare da zona `celer.tec.br`): aponte
+`os.celer.tec.br` para o IP público do Traefik (187.95.46.25) — proxied
+funciona com o Origin Cert existente; sem proxy, entre com um certresolver
+ou Origin Cert próprio do host.
 
 Build + deploy (a tag segue a versão da base python — padrão do datacenter;
 rebuild com a mesma tag + `denv update` re-publica código/conteúdo novo):
