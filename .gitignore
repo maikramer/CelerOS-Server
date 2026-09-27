@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.playwright-mcp/
+portal-*.png
+*.zip
+.DS_Store

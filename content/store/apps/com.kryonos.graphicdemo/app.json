@@ -1,0 +1,11 @@
+{
+  "name": "Graphic Demo",
+  "packageName": "com.kryonos.graphicdemo",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "KryonOS Team",
+  "type": "App",
+  "category": "Utility",
+  "description": "A graphics rendering showcase.",
+  "changelog": ""
+}

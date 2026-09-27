@@ -1,0 +1,16 @@
+{
+  "articles": [
+    {
+      "title": "Instalar um app pela loja",
+      "url": "https://os.celer.tec.br/help/articles/loja-instalar.json"
+    },
+    {
+      "title": "Instalar por SD ou flash",
+      "url": "https://os.celer.tec.br/help/articles/loja-destino.json"
+    },
+    {
+      "title": "Publicar um app no hub",
+      "url": "https://os.celer.tec.br/help/articles/loja-publicar.json"
+    }
+  ]
+}

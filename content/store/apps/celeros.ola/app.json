@@ -1,0 +1,9 @@
+{
+  "name": "Ola Celer",
+  "packageName": "celeros.ola",
+  "version": "1.0.0",
+  "author": "Celer",
+  "description": "Primeiro app do catalogo CelerOS: tela de boas-vindas com contador de toques. Exemplo minimo de main.js para desenvolvedores.",
+  "category": "Demos",
+  "api": 3
+}

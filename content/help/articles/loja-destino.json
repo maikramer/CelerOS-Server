@@ -1,0 +1,3 @@
+{
+  "content": "Onde o app e instalado:\n\n- Padrao: /local/apps (memoria flash do aparelho).\n- Com o arquivo /local/config_install_sd.txt presente: /sd/apps (cartao SD).\n\nOu seja: crie o arquivo config_install_sd.txt (pelo web file manager ou pelo cartao SD) para direcionar as instalacoes ao SD; apague-o para voltar a flash.\n\nTambem e possivel instalar sem rede: Installer (varre o SD) ou kryonctl apps install pela USB."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Image Viewer",
+  "packageName": "com.kryonos.imageviewer",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "KryonOS Team",
+  "type": "App",
+  "category": "Utility",
+  "description": "An Image Viewer Use To View BMP Image Files.",
+  "changelog": ""
+}

@@ -1,0 +1,3 @@
+{
+  "content": "Publicar seu app no hub (os.celer.tec.br):\n\n1. Crie a pasta do app com app.json, main.js e (opcional) icon.png.\n2. app.json: name, packageName (ex.: celeros.seuapp), version (x.y.z), author, description, category, api.\n3. Use ES5, canvas 240x320 e tema System.theme(); strings SEM acentos.\n4. Empacote e publique:\n\npython3 tools/publish_app.py pasta-do-app --hub https://os.celer.tec.br --token TOKEN\n\nO app entra no catalogo na hora; a loja do aparelho mostra no proximo Atualizar.\n\nDocumentacao completa: os.celer.tec.br (secao Devs)."
+}

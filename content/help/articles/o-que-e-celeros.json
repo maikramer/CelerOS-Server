@@ -1,0 +1,3 @@
+{
+  "content": "CelerOS e um sistema para ESP32 baseado no KryonOS (fork GPL-3.0), mantido pela Celer. Roda apps escritos em JavaScript (ES5) sobre um canvas 240x320 com tema do sistema.\n\nEste aparelho tem duas particoes de firmware (ota_0/ota_1): as atualizacoes sao gravadas no slot inativo e so entram depois de validadas — se algo falhar, o sistema atual continua no ar.\n\nOs apps ficam no disco (/local/apps ou /sd/apps) e nao sao afetados pelo OTA de firmware."
+}

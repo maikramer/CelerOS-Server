@@ -1,0 +1,3 @@
+{
+  "content": "Primeira conexao:\n\n1. Abra Settings > WiFi.\n2. Escolha a rede na lista e digite a senha no teclado.\n3. Aguarde o IP aparecer no topo.\n\nO aparelho guarda as redes conhecidas e reconecta sozinho. Se a rede mudar de senha, selecione-a de novo.\n\nSem teclado na tela? Use o portal de configuracao: com o servidor web ligado (app Web Server), abra http://IP-DO-APARELHO no navegador do PC."
+}

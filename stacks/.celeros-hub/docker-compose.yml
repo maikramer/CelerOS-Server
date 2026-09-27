@@ -1,0 +1,99 @@
+# =============================================================================
+# docker-compose.yml — stack celeros-hub (Swarm)
+# =============================================================================
+# Servico unico: imagem custom locatelli/celeros-hub (FastAPI/uvicorn) que
+# serve o portal, a loja, os canais OTA e a ajuda; publica no Traefik como
+# os.celer.tec.br. O conteudo vem do NFS (rsync do denv) e fica rw porque a
+# API admin publica apps/firmware em runtime.
+#
+# NOTAS
+# - docker stack deploy NAO le .env: valores inline em environment:.
+# - Sem dependencia interna (banco etc.): tudo é arquivo em /data/content.
+# - Container roda como root de propósito: precisa gravar no bind NFS
+#   sincronizado pelo denv (rsync como root) sem briga de uid.
+
+x-logging: &logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+x-deploy-common: &deploy-common
+  mode: replicated
+  replicas: 1
+  update_config:
+    delay: 10s
+  restart_policy:
+    condition: any
+    delay: 30s
+    max_attempts: 0
+    window: 60s
+
+services:
+  hub:
+    hostname: hub
+    image: locatelli/celeros-hub:${BASE_TAG:-3.12.10}
+
+    environment:
+      - TZ=America/Sao_Paulo
+      - LANG=C.UTF-8
+      # Base para as URLs absolutas do catalogo (cliente da loja segue URL
+      # absoluta; em teste local sobrepasse com http://...).
+      - BASE_URL=https://os.celer.tec.br
+      - CONTENT_DIR=/data/content
+      - HUB_VERSION=0.1.0
+      # Token admin vem de secret (criado a parte; NUNCA em environment):
+      #   printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -
+      - HUB_ADMIN_TOKEN_FILE=/run/secrets/celeros_hub_admin_token
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    volumes:
+      # Conteudo do hub (loja/updates/help/portal) — rw para a API admin.
+      - /mnt/nfs/celeros-hub/content:/data/content
+
+    secrets:
+      - source: celeros_hub_admin_token
+        target: celeros_hub_admin_token
+
+    networks:
+      - traefik-public
+
+    deploy:
+      <<: *deploy-common
+      placement:
+        constraints:
+          - node.role == worker
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.celeros-hub.rule=Host(`os.celer.tec.br`)"
+        - "traefik.http.routers.celeros-hub.entrypoints=websecure"
+        - "traefik.http.routers.celeros-hub.tls=true"
+        - "traefik.http.services.celeros-hub.loadbalancer.server.port=8080"
+        # - "traefik.http.routers.celeros-hub.middlewares=secure-headers@file"
+
+    <<: *logging
+
+# Token da area admin (publicar apps/firmware). Crie ANTES do deploy:
+#   printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -
+secrets:
+  celeros_hub_admin_token:
+    name: celeros_hub_admin_token
+    external: true
+
+networks:
+  traefik-public:
+    external: true

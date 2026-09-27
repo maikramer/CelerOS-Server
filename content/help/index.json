@@ -1,0 +1,12 @@
+{
+  "categories": [
+    {
+      "name": "Comecando",
+      "url": "https://os.celer.tec.br/help/categories/comecando.json"
+    },
+    {
+      "name": "Loja e apps",
+      "url": "https://os.celer.tec.br/help/categories/loja-e-apps.json"
+    }
+  ]
+}

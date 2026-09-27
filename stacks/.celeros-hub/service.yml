@@ -1,0 +1,88 @@
+# =============================================================================
+# service.yml — stack celeros-hub (denv / Swarm)
+# =============================================================================
+# Servidor do CelerOS Hub em os.celer.tec.br: loja de apps (App Store do
+# dispositivo), canais OTA por placa (update.json + firmware.bin), central de
+# ajuda online e portal web com o branding Celer. Imagem propria (FastAPI),
+# conteudo estatico em NFS sincronizado pelo denv (rsync).
+#
+# STACK EXTERNA: vive no proprio repo da aplicacao (CelerOS-Server), no layout
+# stacks/.celeros-hub/. Registro unico na maquina de dev:
+#   denv external add ~/GitClones/CelerOS-Server
+# Deploy (build + push + rolling update):
+#   denv start celeros-hub -t 3.12.10     # 1a vez
+#   denv update celeros-hub -t 3.12.10    # depois de mudar codigo/conteudo
+# A tag acompanha a VERSAO DA BASE python (ver dockerfile.celeros-hub) —
+# padrao do datacenter (mesma tag versiona base e imagem produzida). Rebuild
+# com a mesma tag sobrescreve no registry; o deploy usa --resolve-image always.
+# Git-guard: commit + push antes de deployar (bypass: --no-git-check).
+
+name: celeros-hub
+version: latest
+
+categories:
+  - application
+  - web
+
+description: |
+  CelerOS Hub — loja de apps (App Store do dispositivo), canais OTA
+  (esp32/CYD e smartdisplay_4848S040), central de ajuda online e portal web
+  em os.celer.tec.br. Publicacao de apps/firmware via API admin autenticada
+  (tools/publish_app.py e tools/publish_firmware.py).
+
+# Traefik fornece o entrypoint websecure + TLS para os.celer.tec.br.
+dependencies:
+  - traefik
+
+ignore: false
+
+ports: []
+
+healthcheck:
+  enabled: true
+  path: "/health"
+  interval: 30
+
+monitoring:
+  enabled: true
+  endpoints:
+    - path: "/health"
+      type: "json"
+    - path: "/api/info"
+      type: "json"
+
+tags:
+  - celeros
+  - esp32
+  - appstore
+  - ota
+  - hub
+
+# -----------------------------------------------------------------------------
+# Imagem custom (fluxo build do denv): tag = versao da base python.
+# -----------------------------------------------------------------------------
+version_pattern: ^\d+\.\d+\.\d+$
+example: 3.12.10
+registry: locatelli/celeros-hub
+tags_url: https://hub.docker.com/r/library/python/tags
+
+build:
+  context: .
+  dockerfile: dockerfile.celeros-hub
+
+# -----------------------------------------------------------------------------
+# sync: o CONTEUDO do hub vai por rsync para o NFS; o compose monta em
+# /data/content (rw — a API admin publica apps/firmware em runtime).
+# -----------------------------------------------------------------------------
+sync:
+  profile: "small_config"
+  enabled: true
+  auto_create_dirs: true
+  required_dirs:
+    - "content"
+  files:
+    - $common_files.docker_compose
+    - $common_files.env_file
+  dirs:
+    - source: "content"
+      destination: "content"

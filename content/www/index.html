@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CelerOS Hub — loja de apps e updates OTA</title>
+<meta name="description" content="Loja de apps, atualizações OTA e central de ajuda do CelerOS (ESP32).">
+<link rel="icon" type="image/png" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/">
+    <img src="/assets/celeros_logo.png" alt="CelerOS" height="34">
+  </a>
+  <nav>
+    <a href="#loja">Loja</a>
+    <a href="#firmware">Firmware</a>
+    <a href="#ajuda">Ajuda</a>
+    <a href="#devs">Devs</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <img class="hero-logo" src="/assets/celer_logo.png" alt="Celer">
+  <h1>o hub do <strong>CelerOS</strong></h1>
+  <p class="sub">Loja de apps, atualizações <strong>OTA</strong> e central de ajuda para o
+  sistema CelerOS em ESP32 — CYD e SmartDisplay 4&rdquo;. Tudo em um lugar,
+  servido direto para os dispositivos.</p>
+  <div class="chips">
+    <span class="chip">os.celer.tec.br</span>
+    <span class="chip">App Store nativa</span>
+    <span class="chip">OTA por canal de placa</span>
+  </div>
+</section>
+
+<main>
+
+<section id="loja" class="card">
+  <div class="card-head">
+    <h2>Loja de apps</h2>
+    <span class="pill" id="store-count">carregando…</span>
+  </div>
+  <p class="muted">Catálogo que a App Store do dispositivo lê. Toque em
+  <em>Atualizar</em> na loja do aparelho para recarregar; instalar daqui
+  aparece no launcher na hora.</p>
+  <div id="apps-grid" class="grid">
+    <noscript>Ative o JavaScript para ver o catálogo.</noscript>
+  </div>
+</section>
+
+<section id="firmware" class="card">
+  <div class="card-head">
+    <h2>Firmware / OTA</h2>
+    <span class="pill" id="fw-count">carregando…</span>
+  </div>
+  <p class="muted">Um canal por placa. O dispositivo consulta
+  <code>/updates/&lt;canal&gt;/update.json</code> (Settings → Atualização) e instala
+  sozinho; enquanto a versão publicada não for maior que a instalada, ele
+  fica parado.</p>
+  <table class="tbl" id="fw-table">
+    <thead><tr><th>Canal</th><th>Versão</th><th>Firmware</th><th>Novidades</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="ajuda" class="card">
+  <div class="card-head"><h2>Ajuda online</h2></div>
+  <p class="muted">A central lida pelo app <strong>Ajuda</strong> do dispositivo
+  (<code>/help/index.json</code>) e por qualquer navegador:</p>
+  <ul id="help-list" class="links"></ul>
+</section>
+
+<section id="devs" class="card">
+  <div class="card-head"><h2>Para desenvolvedores</h2></div>
+  <p>Um app é uma pasta com <code>app.json</code>, <code>main.js</code> e (opcional)
+  <code>icon.png</code>. Empacote e publique com a CLI do repo do hub:</p>
+  <pre><code># app (zip com app.json + main.js [+ icon.png])
+python3 tools/publish_app.py minha-pasta-do-app \
+  --hub https://os.celer.tec.br --token $CELERSO_HUB_TOKEN
+
+# firmware OTA em um canal (esp32 | smartdisplay_4848S040)
+python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
+  --version 1.3.0 --changelog "- novidade X" \
+  --hub https://os.celer.tec.br --token $CELERSO_HUB_TOKEN</code></pre>
+  <p>Contrato do <code>app.json</code> (API atual do sistema: <strong>5</strong>):</p>
+  <pre><code>{
+  "name": "Meu App",
+  "packageName": "celeros.meuapp",
+  "version": "1.0.0",
+  "author": "voce",
+  "description": "sem acentos: a fonte do dispositivo nao tem.",
+  "category": "Utilidades",
+  "api": 5
+}</code></pre>
+  <p class="muted">Endpoints: <code>GET /store/index.json</code> ·
+  <code>GET /api/info</code> · <code>GET /health</code> ·
+  <code>POST /admin/apps</code> · <code>POST /admin/updates/&lt;canal&gt;</code>
+  (admin: <code>Authorization: Bearer &lt;token&gt;</code>).</p>
+</section>
+
+</main>
+
+<footer>
+  <img src="/assets/celer_favicon.png" alt="" height="22">
+  <span>Celer · 2026 — CelerOS é um fork (GPL-3.0) do
+  <a href="https://github.com/Haris16-code/KryonOS">KryonOS</a>.</span>
+</footer>
+
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function loadStore() {
+  const grid = document.getElementById("apps-grid");
+  try {
+    const all = await (await fetch("/store/all.json")).json();
+    const apps = Object.entries(all.apps || {});
+    document.getElementById("store-count").textContent =
+      apps.length + (apps.length === 1 ? " app" : " apps");
+    if (!apps.length) {
+      grid.innerHTML = '<p class="muted">Catálogo vazio — publique o primeiro app.</p>';
+      return;
+    }
+    apps.sort((a, b) => a[1].name.localeCompare(b[1].name));
+    grid.innerHTML = apps.map(([pkg, e]) => `
+      <article class="app">
+        <div class="app-icon">
+          <img src="${esc(e.icon || "/assets/celer_favicon.png")}" alt=""
+               onerror="this.src='/assets/celer_favicon.png'">
+        </div>
+        <div class="app-body">
+          <h3>${esc(e.name)}</h3>
+          <p class="desc">${esc(e.description)}</p>
+          <div class="meta">
+            <span class="pill">v${esc(e.version)}</span>
+            <span class="pill">API ${esc(e.api)}</span>
+            <span class="pill dim">${esc(e.category || "Apps")}</span>
+            <span class="pill dim">${esc(e.author)}</span>
+          </div>
+        </div>
+      </article>`).join("");
+  } catch (err) {
+    grid.innerHTML = '<p class="muted">Catálogo indisponível.</p>';
+    document.getElementById("store-count").textContent = "—";
+  }
+}
+
+async function loadFirmware() {
+  const tbody = document.querySelector("#fw-table tbody");
+  try {
+    const info = await (await fetch("/api/info")).json();
+    const chs = Object.entries(info.updates || {});
+    document.getElementById("fw-count").textContent =
+      chs.length + (chs.length === 1 ? " canal" : " canais");
+    tbody.innerHTML = "";
+    for (const [ch, meta] of chs) {
+      let news = "";
+      try {
+        const doc = await (await fetch(`/updates/${ch}/update.json`)).json();
+        news = (doc.changelog || "").split("\n")
+          .filter(Boolean).slice(0, 2).join(" · ");
+      } catch (e) {}
+      tbody.insertAdjacentHTML("beforeend", `<tr>
+        <td><code>${esc(ch)}</code></td>
+        <td>v${esc(meta.version || "?")}</td>
+        <td>${meta.hasFirmware ? '<span class="pill">disponível</span>'
+                                : '<span class="pill dim">manifest only</span>'}</td>
+        <td class="muted">${esc(news)}</td>
+      </tr>`);
+    }
+  } catch (err) {
+    document.getElementById("fw-count").textContent = "—";
+  }
+}
+
+async function loadHelp() {
+  const ul = document.getElementById("help-list");
+  try {
+    const idx = await (await fetch("/help/index.json")).json();
+    ul.innerHTML = (idx.categories || []).map(c =>
+      `<li><a href="${esc(c.url)}">${esc(c.name)}</a></li>`).join("")
+      || '<li class="muted">Nenhuma categoria publicada.</li>';
+  } catch (err) {
+    ul.innerHTML = '<li class="muted">Ajuda indisponível.</li>';
+  }
+}
+
+loadStore(); loadFirmware(); loadHelp();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "Calendar",
+  "packageName": "com.kryonos.calendar",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "KryonOS Team",
+  "type": "App",
+  "category": "Utility",
+  "description": "A simple calendar to track dates.",
+  "changelog": ""
+}

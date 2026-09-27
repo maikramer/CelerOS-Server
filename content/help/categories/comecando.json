@@ -1,0 +1,16 @@
+{
+  "articles": [
+    {
+      "title": "O que e o CelerOS",
+      "url": "https://os.celer.tec.br/help/articles/o-que-e-celeros.json"
+    },
+    {
+      "title": "Conectar no WiFi",
+      "url": "https://os.celer.tec.br/help/articles/wifi.json"
+    },
+    {
+      "title": "Atualizar o sistema (OTA)",
+      "url": "https://os.celer.tec.br/help/articles/ota.json"
+    }
+  ]
+}

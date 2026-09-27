@@ -1,0 +1,11 @@
+{
+  "name": "System Info",
+  "packageName": "com.kryonos.systeminfo",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "KryonOS Team",
+  "type": "App",
+  "category": "Utility",
+  "description": "System information and stats.",
+  "changelog": ""
+}
