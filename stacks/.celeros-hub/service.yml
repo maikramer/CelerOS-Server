@@ -63,7 +63,7 @@ tags:
 # -----------------------------------------------------------------------------
 version_pattern: ^\d+\.\d+\.\d+$
 example: 3.12.10
-registry: locatelli/celeros-hub
+registry: maikramer/celeros-hub
 tags_url: https://hub.docker.com/r/library/python/tags
 
 build:

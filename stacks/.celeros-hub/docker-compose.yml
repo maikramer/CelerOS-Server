@@ -1,7 +1,7 @@
 # =============================================================================
 # docker-compose.yml — stack celeros-hub (Swarm)
 # =============================================================================
-# Servico unico: imagem custom locatelli/celeros-hub (FastAPI/uvicorn) que
+# Servico unico: imagem custom maikramer/celeros-hub (FastAPI/uvicorn) que
 # serve o portal, a loja, os canais OTA e a ajuda; publica no Traefik como
 # os.celer.tec.br. O conteudo vem do NFS (rsync do denv) e fica rw porque a
 # API admin publica apps/firmware em runtime.
@@ -33,7 +33,7 @@ x-deploy-common: &deploy-common
 services:
   hub:
     hostname: hub
-    image: locatelli/celeros-hub:${BASE_TAG:-3.12.10}
+    image: maikramer/celeros-hub:${BASE_TAG:-3.12.10}
 
     environment:
       - TZ=America/Sao_Paulo
