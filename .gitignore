@@ -5,3 +5,6 @@ __pycache__/
 portal-*.png
 *.zip
 .DS_Store
+
+# credenciais locais do hub (NUNCA commitar)
+env/

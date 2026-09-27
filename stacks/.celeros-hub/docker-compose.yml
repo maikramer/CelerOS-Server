@@ -79,7 +79,10 @@ services:
       <<: *deploy-common
       placement:
         constraints:
-          - node.role == worker
+          # Fixa no no com /mnt/nfs montado (padrao .dsh): o bind do content/
+          # resolve no disco local do no onde a task cair, e o sync (denv
+          # connect -> dockergpu) cria /mnt/nfs/celeros-hub la.
+          - node.hostname == dockergpu
       resources:
         limits:
           cpus: "0.50"
@@ -89,6 +92,7 @@ services:
           memory: 64M
       labels:
         - "traefik.enable=true"
+        - "traefik.swarm.network=traefik-public"
         - "traefik.http.routers.celeros-hub.rule=Host(`os.celer.tec.br`)"
         - "traefik.http.routers.celeros-hub.entrypoints=websecure"
         - "traefik.http.routers.celeros-hub.tls=true"
