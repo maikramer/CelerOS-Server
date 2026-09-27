@@ -54,7 +54,9 @@ services:
       - HUB_TOKENS_FILE=/run/secrets/celeros_hub_tokens
 
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      # 127.0.0.1 e nao localhost: busybox wget resolve localhost p/ ::1 e o
+      # uvicorn escuta so IPv4 (0.0.0.0) — localhost dava connection refused.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
