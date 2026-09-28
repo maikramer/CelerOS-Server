@@ -6,10 +6,12 @@ para POST /admin/apps. Token: --token ou env CELER_HUB_TOKEN.
 
 Uso:
     python3 tools/publish_app.py caminho/da/pasta-do-app \
-        [--hub https://os.celer.tec.br] [--token TOKEN]
+        [--hub https://os.celer.tec.br] [--token TOKEN] [--force]
 
 Validacoes do servidor: packageName (ex.: celeros.meuapp), version semver,
-campos obrigatorios; catalogo (store/*.json) e regenerado no publish.
+campos obrigatorios, main.js <= 30 KB, dono do pacote e anti-downgrade
+(versao <= atual exige --force); catalogo (store/*.json) e regenerado no
+publish e o hub grava size/md5/published_at/publisher no app.json.
 """
 
 import argparse
@@ -22,6 +24,7 @@ from pathlib import Path
 from urllib import error, request
 
 REQUIRED = ("name", "packageName", "version", "author", "description")
+MAX_MAIN_JS = 30 * 1024  # mesmo teto do servidor (device trunca em 32 KB)
 
 
 def die(msg: str) -> None:
@@ -34,6 +37,8 @@ def main() -> None:
     ap.add_argument("folder", help="pasta do app (app.json + main.js)")
     ap.add_argument("--hub", default=os.environ.get("CELER_HUB", "https://os.celer.tec.br"))
     ap.add_argument("--token", default=os.environ.get("CELER_HUB_TOKEN", ""))
+    ap.add_argument("--force", action="store_true",
+                    help="republica mesmo com versao <= atual ou de outro dono")
     args = ap.parse_args()
 
     src = Path(args.folder).expanduser().resolve()
@@ -55,6 +60,9 @@ def main() -> None:
         die("packageName deve ser tipo celeros.meuapp (minusculo, com ponto)")
     if not re.match(r"^\d+\.\d+\.\d+$", meta["version"]):
         die("version deve ser semver x.y.z")
+    if code_path.stat().st_size > MAX_MAIN_JS:
+        die(f"main.js tem {code_path.stat().st_size} bytes; "
+            f"o device trunca em 32 KB (max {MAX_MAIN_JS})")
 
     token = args.token
     if not token:
@@ -70,16 +78,21 @@ def main() -> None:
                 zf.write(icon, "icon.png")
         blob = zpath.read_bytes()
 
-    # multipart (campo "file") como o endpoint FastAPI espera
+    # multipart (campo "file" + form force) como o endpoint FastAPI espera
     boundary = "----celeroshub7d1f2c"
     part = (
         f"--{boundary}\r\n"
         "Content-Disposition: form-data; name=\"file\"; filename=\"app.zip\"\r\n"
         "Content-Type: application/zip\r\n\r\n"
     ).encode()
+    force_part = (
+        f"--{boundary}\r\n"
+        "Content-Disposition: form-data; name=\"force\"\r\n\r\n"
+        f"{'1' if args.force else '0'}\r\n"
+    ).encode()
     req = request.Request(
         f"{args.hub.rstrip('/')}/admin/apps",
-        data=part + blob + f"\r\n--{boundary}--\r\n".encode(),
+        data=part + blob + force_part + f"--{boundary}--\r\n".encode(),
         method="POST",
         headers={
             "Authorization": f"Bearer {token}",
@@ -94,7 +107,8 @@ def main() -> None:
         die(f"falha de rede: {e.reason}")
 
     print(f"ok: {out.get('package')} v{out.get('version')} publicado "
-          f"({out.get('store', {}).get('apps')} apps no catalogo)")
+          f"({out.get('size', 0)} B, md5 {out.get('md5', '?')[:8]}..., "
+          f"{out.get('store', {}).get('apps')} apps no catalogo)")
 
 
 if __name__ == "__main__":

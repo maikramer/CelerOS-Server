@@ -25,12 +25,13 @@
 <section class="hero">
   <img class="hero-logo" src="/assets/celer_logo.png" alt="Celer">
   <h1>o hub do <strong>CelerOS</strong></h1>
-  <p class="sub">Loja de apps, atualizações <strong>OTA</strong> e central de ajuda para o
-  sistema CelerOS em ESP32 — CYD e SmartDisplay 4&rdquo;. Tudo em um lugar,
-  servido direto para os dispositivos.</p>
+  <p class="sub">Loja de apps com <strong>atualização pela App Store</strong>, updates
+  <strong>OTA</strong> e central de ajuda para o sistema CelerOS em ESP32 —
+  CYD e SmartDisplay 4&rdquo;. Tudo em um lugar, servido direto para os dispositivos.</p>
   <div class="chips">
     <span class="chip">os.celer.tec.br</span>
     <span class="chip">App Store nativa</span>
+    <span class="chip">Updates com checksum</span>
     <span class="chip">OTA por canal de placa</span>
   </div>
 </section>
@@ -42,12 +43,21 @@
     <h2>Loja de apps</h2>
     <span class="pill" id="store-count">carregando…</span>
   </div>
-  <p class="muted">Catálogo que a App Store do dispositivo lê. Toque em
-  <em>Atualizar</em> na loja do aparelho para recarregar; instalar daqui
-  aparece no launcher na hora.</p>
+  <p class="muted">Catálogo que a App Store do dispositivo lê. Quando a versão
+  publicada aqui é maior que a instalada, a loja do aparelho mostra
+  <em>Atualizações (N)</em> — o update valida o checksum antes de trocar o app.</p>
+  <div class="store-tools">
+    <input id="store-search" class="search" type="search"
+           placeholder="buscar por nome, descrição ou autor…" autocomplete="off">
+    <div id="cat-chips" class="cat-chips"></div>
+  </div>
   <div id="apps-grid" class="grid">
     <noscript>Ative o JavaScript para ver o catálogo.</noscript>
   </div>
+</section>
+
+<section id="detalhe" class="card" hidden>
+  <div id="detalhe-body"></div>
 </section>
 
 <section id="firmware" class="card">
@@ -75,28 +85,41 @@
 <section id="devs" class="card">
   <div class="card-head"><h2>Para desenvolvedores</h2></div>
   <p>Um app é uma pasta com <code>app.json</code>, <code>main.js</code> e (opcional)
-  <code>icon.png</code>. Empacote e publique com a CLI do repo do hub:</p>
+  <code>icon.png</code> (PNG 64×64). Empacote e publique com a CLI do repo do hub:</p>
   <pre><code># app (zip com app.json + main.js [+ icon.png])
 python3 tools/publish_app.py minha-pasta-do-app \
-  --hub https://os.celer.tec.br --token $CELERSO_HUB_TOKEN
+  --hub https://os.celer.tec.br --token $CELER_HUB_TOKEN
 
 # firmware OTA em um canal (esp32 | smartdisplay_4848S040)
 python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
   --version 1.3.0 --changelog "- novidade X" \
-  --hub https://os.celer.tec.br --token $CELERSO_HUB_TOKEN</code></pre>
-  <p>Contrato do <code>app.json</code> (API atual do sistema: <strong>5</strong>):</p>
+  --hub https://os.celer.tec.br --token $CELER_HUB_TOKEN</code></pre>
+  <p>Contrato do <code>app.json</code> (API atual do sistema: <strong>6</strong>).</p>
   <pre><code>{
   "name": "Meu App",
   "packageName": "celeros.meuapp",
-  "version": "1.0.0",
+  "version": "1.0.0",            // suba a cada publicacao
   "author": "voce",
   "description": "sem acentos: a fonte do dispositivo nao tem.",
   "category": "Utilidades",
-  "api": 5
-}</code></pre>
+  "api": 6,
+  "changelog": "1.0.0 - primeiro lancamento"
+}
+
+// campos gerenciados pelo hub (gravados no publish, nao edite):
+// "size", "md5", "published_at", "publisher"</code></pre>
+  <p class="muted">Regras da loja: <code>main.js</code> até <strong>30 KB</strong> (o
+  dispositivo trunca em 32 KB) e <code>icon.png</code> até <strong>16 KB</strong>.
+  Quem publica primeiro um <code>packageName</code> vira o <strong>dono</strong> —
+  só o dono (ou o hub) atualiza/remove. Versão nova tem que ser
+  <strong>maior</strong> que a publicada; republicar a mesma exige
+  <code>--force</code>. O device valida o <code>md5</code> depois de baixar.</p>
   <p class="muted">Endpoints: <code>GET /store/index.json</code> ·
+  <code>GET /store/all.json</code> ·
+  <code>GET /store/apps/&lt;pkg&gt;/main.js</code> ·
   <code>GET /api/info</code> · <code>GET /health</code> ·
-  <code>POST /admin/apps</code> · <code>POST /admin/updates/&lt;canal&gt;</code>
+  <code>POST /admin/apps</code> · <code>DELETE /admin/apps/&lt;pkg&gt;</code> ·
+  <code>POST /admin/updates/&lt;canal&gt;</code>
   (admin: <code>Authorization: Bearer &lt;token&gt;</code>).</p>
 </section>
 
@@ -112,40 +135,140 @@ python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// estado da loja no portal
+const store = { apps: [], downloads: {}, cat: "Todos", q: "" };
+
+function fmtSize(n) {
+  if (!n && n !== 0) return "";
+  return n >= 1024 ? (n / 1024).toFixed(n % 1024 ? 1 : 0) + " KB" : n + " B";
+}
+function fmtDate(iso) { return iso ? String(iso).slice(0, 10) : ""; }
+
 async function loadStore() {
   const grid = document.getElementById("apps-grid");
   try {
-    const all = await (await fetch("/store/all.json")).json();
-    const apps = Object.entries(all.apps || {});
+    const [all, info] = await Promise.all([
+      fetch("/store/all.json").then(r => r.json()),
+      fetch("/api/info").then(r => r.json()).catch(() => ({})),
+    ]);
+    store.apps = Object.entries(all.apps || {}).map(([pkg, e]) => ({ pkg, ...e }));
+    store.downloads = info.downloads || {};
     document.getElementById("store-count").textContent =
-      apps.length + (apps.length === 1 ? " app" : " apps");
-    if (!apps.length) {
-      grid.innerHTML = '<p class="muted">Catálogo vazio — publique o primeiro app.</p>';
-      return;
-    }
-    apps.sort((a, b) => a[1].name.localeCompare(b[1].name));
-    grid.innerHTML = apps.map(([pkg, e]) => `
-      <article class="app">
-        <div class="app-icon">
-          <img src="${esc(e.icon || "/assets/celer_favicon.png")}" alt=""
-               onerror="this.src='/assets/celer_favicon.png'">
-        </div>
-        <div class="app-body">
-          <h3>${esc(e.name)}</h3>
-          <p class="desc">${esc(e.description)}</p>
-          <div class="meta">
-            <span class="pill">v${esc(e.version)}</span>
-            <span class="pill">API ${esc(e.api)}</span>
-            <span class="pill dim">${esc(e.category || "Apps")}</span>
-            <span class="pill dim">${esc(e.author)}</span>
-          </div>
-        </div>
-      </article>`).join("");
+      store.apps.length + (store.apps.length === 1 ? " app" : " apps");
+
+    // chips de categoria a partir do catalogo
+    const cats = [...new Set(store.apps.map(a => a.category || "Apps"))].sort();
+    const chips = document.getElementById("cat-chips");
+    chips.innerHTML = ["Todos", ...cats].map(c =>
+      `<button class="cat-chip${c === store.cat ? " active" : ""}"
+               data-cat="${esc(c)}">${esc(c)}</button>`).join("");
+    chips.onclick = ev => {
+      const b = ev.target.closest(".cat-chip");
+      if (!b) return;
+      store.cat = b.dataset.cat;
+      chips.querySelectorAll(".cat-chip")
+        .forEach(x => x.classList.toggle("active", x === b));
+      renderGrid();
+    };
+    document.getElementById("store-search").oninput = ev => {
+      store.q = ev.target.value.trim().toLowerCase();
+      renderGrid();
+    };
+    renderGrid();
   } catch (err) {
     grid.innerHTML = '<p class="muted">Catálogo indisponível.</p>';
     document.getElementById("store-count").textContent = "—";
   }
+  route();
 }
+
+function renderGrid() {
+  const grid = document.getElementById("apps-grid");
+  const q = store.q;
+  const list = store.apps
+    .filter(a => store.cat === "Todos" || (a.category || "Apps") === store.cat)
+    .filter(a => !q ||
+      [a.name, a.description, a.author, a.pkg].some(s =>
+        String(s || "").toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!store.apps.length) {
+    grid.innerHTML = '<p class="muted">Catálogo vazio — publique o primeiro app.</p>';
+    return;
+  }
+  if (!list.length) {
+    grid.innerHTML = '<p class="muted">Nada encontrado com esse filtro.</p>';
+    return;
+  }
+  grid.innerHTML = list.map(a => `
+    <article class="app" data-pkg="${esc(a.pkg)}">
+      <div class="app-icon">
+        <img src="${esc(a.icon || "/assets/celer_favicon.png")}" alt=""
+             onerror="this.src='/assets/celer_favicon.png'">
+      </div>
+      <div class="app-body">
+        <h3>${esc(a.name)}</h3>
+        <p class="desc">${esc(a.description)}</p>
+        <div class="meta">
+          <span class="pill">v${esc(a.version)}</span>
+          ${a.size ? `<span class="pill">${esc(fmtSize(a.size))}</span>` : ""}
+          <span class="pill">${store.downloads[a.pkg] || 0} down</span>
+          <span class="pill dim">${esc(a.category || "Apps")}</span>
+          ${a.published_at ? `<span class="pill dim">${esc(fmtDate(a.published_at))}</span>` : ""}
+        </div>
+      </div>
+    </article>`).join("");
+  grid.onclick = ev => {
+    const card = ev.target.closest(".app");
+    if (card) location.hash = "#/app/" + card.dataset.pkg;
+  };
+}
+
+function renderDetail(pkg) {
+  const a = store.apps.find(x => x.pkg === pkg);
+  if (!a) return;
+  const dl = store.downloads[pkg] || 0;
+  document.getElementById("detalhe-body").innerHTML = `
+    <div class="detail-head">
+      <div class="detail-icon">
+        <img src="${esc(a.icon || "/assets/celer_favicon.png")}" alt=""
+             onerror="this.src='/assets/celer_favicon.png'">
+      </div>
+      <div>
+        <h2 style="margin:0">${esc(a.name)}</h2>
+        <div class="meta" style="margin-top:6px">
+          <span class="pill">v${esc(a.version)}</span>
+          <span class="pill">API ${esc(a.api || 1)}</span>
+          ${a.size ? `<span class="pill">${esc(fmtSize(a.size))}</span>` : ""}
+          <span class="pill">${dl} download${dl === 1 ? "" : "s"}</span>
+          <span class="pill dim">${esc(a.category || "Apps")}</span>
+          ${a.published_at ? `<span class="pill dim">atualizado em ${esc(fmtDate(a.published_at))}</span>` : ""}
+        </div>
+        <p class="muted" style="margin:6px 0 0">por ${esc(a.author || "desconhecido")} ·
+          <code>${esc(pkg)}</code></p>
+      </div>
+    </div>
+    <p>${esc(a.description || "")}</p>
+    ${a.changelog ? `
+      <h3>O que há de novo</h3>
+      <div class="changelog">${esc(a.changelog)}</div>` : ""}
+    <p class="muted">Instale pelo dispositivo: <strong>App Store</strong> → toque no
+    app → <em>${"Instalar"}</em>. Apps já instalados aparecem como
+    <em>Atualizações (N)</em> no topo da loja.</p>
+    <a class="btn" href="#loja">&larr; voltar para a loja</a>`;
+}
+
+// roteiro por hash: #/app/<pkg> abre o detalhe; qualquer outra ancora volta
+function route() {
+  const m = location.hash.match(/^#\/app\/([a-z0-9.]+)$/);
+  const hasDetail = m && store.apps.some(a => a.pkg === m[1]);
+  document.getElementById("detalhe").hidden = !hasDetail;
+  document.getElementById("loja").hidden = !!hasDetail;
+  if (hasDetail) {
+    renderDetail(m[1]);
+    document.getElementById("detalhe").scrollIntoView();
+  }
+}
+window.addEventListener("hashchange", route);
 
 async function loadFirmware() {
   const tbody = document.querySelector("#fw-table tbody");

@@ -21,6 +21,11 @@
 #   - auditoria em APPEND-ONLY (AUDIT_DIR): ts, ip, agente, acao, alvo, erro.
 #   - uploads: teto de tamanho (request e descomprimido), whitelist de
 #     arquivos do zip, checagem de PNG, packageName/semver/canal validados.
+#   - apps: publish calcula os campos gerenciados (size, md5, published_at,
+#     publisher) e grava no app.json; rejeita main.js > 30 KB (o device
+#     trunca em 32 KB), versao <= atual (anti-downgrade; force=1 excecao) e
+#     republicacao/remocao por nao-dono. Downloads de main.js sao contados
+#     em STATS_DIR/downloads.json e expostos em /api/info.
 #   - OTA: rejeita versao MENOR que a atual do canal (anti-rollback; force=1
 #     para excecao) e grava firmware_sha256 no manifest.
 #   - /api/docs desligado por padrao (HUB_DOCS=1 para ligar em dev).
@@ -42,16 +47,19 @@ import zipfile
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.2.0"
+HUB_VERSION = "0.3.0"
 BASE_URL = os.environ.get("BASE_URL", "https://os.celer.tec.br").rstrip("/")
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "/data/content"))
 AUDIT_DIR = Path(os.environ.get("AUDIT_DIR", "/data/audit"))
+STATS_DIR = Path(os.environ.get("STATS_DIR", "/data/stats"))
 MAX_UPLOAD = 48 * 1024 * 1024   # teto por upload (firmware ~2 MB; folga p/ zip)
 MAX_UNPACKED = 64 * 1024 * 1024  # teto total descomprimido (anti zip-bomb)
 MAX_BODY = MAX_UPLOAD + 1024 * 1024
+MAX_MAIN_JS = 30 * 1024   # o Net.get do firmware trunca em 32 KB
+MAX_ICON = 16 * 1024      # PNG 64x64 nao passa de poucos KB; teto folgado
 AUTH_FAILS_LIMIT = 10           # falhas de auth...
 AUTH_FAILS_WINDOW = 600         # ...dentro desta janela (s)...
 AUTH_BLOCK_SECS = 900           # ...bloqueiam o IP por este tempo
@@ -62,6 +70,10 @@ PKG_NAME = re.compile(r"^[a-z0-9]+(\.[a-z0-9]+)+$")  # ex.: celeros.demo
 CHANNEL = re.compile(r"^[a-z0-9_.-]+$")
 SLUG = re.compile(r"^[a-z0-9_-]+$")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def _semver_tuple(v: str) -> tuple:
+    return tuple(int(p) for p in v.split("."))
 
 DOCS_ON = os.environ.get("HUB_DOCS", "") == "1"
 app = FastAPI(title="CelerOS Hub", version=HUB_VERSION,
@@ -229,6 +241,36 @@ def whoami(agent: Agent = Depends(authenticate)):
 
 
 # --------------------------------------------------------------------------- #
+# contador de downloads (STATS_DIR/downloads.json: {pkg: n}; sobrevive a
+# remocao/republish do pacote — e historico de downloads, nao estoque).
+# Tráfego e baixo: escrita atomica (tmp+rename) a cada incremento resolve.
+# --------------------------------------------------------------------------- #
+
+_stats: dict | None = None
+
+
+def _load_stats() -> dict:
+    global _stats
+    if _stats is None:
+        doc = read_json(STATS_DIR / "downloads.json")
+        _stats = ({k: int(v) for k, v in doc.items()}
+                  if isinstance(doc, dict) else {})
+    return _stats
+
+
+def _count_download(pkg: str) -> None:
+    stats = _load_stats()
+    stats[pkg] = stats.get(pkg, 0) + 1
+    try:
+        STATS_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = STATS_DIR / "downloads.json.tmp"
+        tmp.write_text(json.dumps(stats), encoding="utf-8")
+        tmp.rename(STATS_DIR / "downloads.json")
+    except OSError:
+        pass  # estatistica nunca derruba o download
+
+
+# --------------------------------------------------------------------------- #
 # catalogo da loja (DINAMICO: gerado por rota a partir do disco — o BASE_URL
 # vem do ambiente do servidor em execucao, nunca fica assado em arquivo).
 # O cliente da loja no dispositivo le:
@@ -284,6 +326,18 @@ def catalog_categories() -> dict[str, dict]:
             "description": str(meta.get("description") or ""),
             "category": cat,
         }
+        # campos do fluxo de atualizacao: a loja do device compara versao,
+        # valida md5 apos baixar e mostra changelog; o portal mostra o resto.
+        # Campos gerenciados pelo publish (size/md5/published_at) sao
+        # opcionais: pacotes antigos publicados a mao nao os tem.
+        if meta.get("changelog"):
+            entry["changelog"] = str(meta["changelog"])
+        if meta.get("size"):
+            entry["size"] = int(meta["size"])
+        if meta.get("md5"):
+            entry["md5"] = str(meta["md5"])
+        if meta.get("published_at"):
+            entry["published_at"] = str(meta["published_at"])
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
         cats.setdefault(slug, {"name": cat, "apps": {}})
@@ -325,6 +379,20 @@ def store_category(slug: str):
     return {"category": cat["name"], "apps": cat["apps"]}
 
 
+@app.get("/store/apps/{pkg}/main.js")
+def download_app_js(pkg: str):
+    """Download do codigo do app com contagem (rota na frente do mount
+    /store; mesmo path, mesmo content-type, cache-control igual)."""
+    if not PKG_NAME.match(pkg):
+        raise HTTPException(404, "pacote nao encontrado")
+    f = CONTENT_DIR / "store" / "apps" / pkg / "main.js"
+    if not f.is_file():
+        raise HTTPException(404, "pacote nao encontrado")
+    _count_download(pkg)
+    return FileResponse(f, media_type="text/javascript",
+                        headers={"cache-control": "no-cache"})
+
+
 # --------------------------------------------------------------------------- #
 # health / info
 # --------------------------------------------------------------------------- #
@@ -360,6 +428,7 @@ def info():
             "categories": sorted({
                 str(m.get("category") or "Apps") for m in apps.values()}),
         },
+        "downloads": dict(sorted(_load_stats().items())),
         "updates": updates,
     }
 
@@ -419,6 +488,7 @@ def _body_too_big(request: Request) -> bool:
 @app.post("/admin/apps")
 async def publish_app(request: Request,
                       file: UploadFile = File(...),
+                      force: str = Form(""),
                       agent: Agent = Depends(require_scope("apps"))):
     if _body_too_big(request):
         raise HTTPException(413, "upload grande demais")
@@ -427,17 +497,49 @@ async def publish_app(request: Request,
         raise HTTPException(413, "pacote grande demais")
     meta, files = _extract_package(data)
     pkg = _validate_meta(meta)
-    if "icon.png" in files and files["icon.png"][:8] != PNG_MAGIC:
-        raise HTTPException(400, "icon.png nao e um PNG")
+    if len(files["main.js"]) > MAX_MAIN_JS:
+        raise HTTPException(413, f"main.js tem {len(files['main.js'])} bytes; "
+                                 f"o device trunca em 32 KB (max {MAX_MAIN_JS})")
+    if "icon.png" in files:
+        if files["icon.png"][:8] != PNG_MAGIC:
+            raise HTTPException(400, "icon.png nao e um PNG")
+        if len(files["icon.png"]) > MAX_ICON:
+            raise HTTPException(413, f"icon.png grande demais (max {MAX_ICON})")
+
+    # dono e anti-downgrade: o publish de atualizacao respeita quem publicou
+    # primeiro e nunca retrocede versao (force=1 exceta ambos; raiz "*" sempre
+    # pode) — mesmo contrato do canal OTA.
     dest = CONTENT_DIR / "store" / "apps" / pkg
+    cur = read_json(dest / "app.json") if dest.is_dir() else None
+    if cur:
+        owner = str(cur.get("publisher") or "")
+        if owner and owner != agent.name and "*" not in agent.scopes:
+            audit(request, agent, "app:publicar", pkg, ok=False,
+                  err=f"pertence a {owner}")
+            raise HTTPException(403, f"pacote pertence a '{owner}'")
+        if cur.get("version") and force != "1" and \
+                _semver_tuple(meta["version"]) <= \
+                _semver_tuple(str(cur["version"])):
+            raise HTTPException(409, f"versao {meta['version']} <= atual "
+                                     f"{cur['version']} (force=1 p/ forcar)")
+
     staging = dest.with_name(dest.name + ".tmp")
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
-    allowed = {"app.json", "main.js", "icon.png"}
-    for name, blob in files.items():
-        if name in allowed:
-            (staging / name).write_bytes(blob)
+    # campos gerenciados pelo hub: recomputados a cada publish, o app.json do
+    # dev manda no resto. Eles viajam para o device no app.json e no catalogo.
+    main_blob = files["main.js"]
+    meta["size"] = len(main_blob)
+    meta["md5"] = hashlib.md5(main_blob).hexdigest()
+    meta["published_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    meta["publisher"] = agent.name
+    if main_blob:
+        (staging / "main.js").write_bytes(main_blob)
+    if "icon.png" in files:
+        (staging / "icon.png").write_bytes(files["icon.png"])
+    (staging / "app.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not (staging / "app.json").exists() or not (staging / "main.js").exists():
         shutil.rmtree(staging)
         raise HTTPException(400, "pacote sem app.json/main.js")
@@ -446,6 +548,7 @@ async def publish_app(request: Request,
     staging.rename(dest)
     audit(request, agent, "app:publicar", f"{pkg}@{meta.get('version')}")
     return {"ok": True, "package": pkg, "version": meta.get("version"),
+            "md5": meta["md5"], "size": meta["size"],
             "store": {"apps": len(scan_apps())}}
 
 
@@ -457,6 +560,12 @@ def delete_app(pkg: str, request: Request,
     dest = CONTENT_DIR / "store" / "apps" / pkg
     if not dest.is_dir():
         raise HTTPException(404, "pacote nao encontrado")
+    cur = read_json(dest / "app.json")
+    owner = str((cur or {}).get("publisher") or "")
+    if owner and owner != agent.name and "*" not in agent.scopes:
+        audit(request, agent, "app:remover", pkg, ok=False,
+              err=f"pertence a {owner}")
+        raise HTTPException(403, f"pacote pertence a '{owner}'")
     shutil.rmtree(dest)
     audit(request, agent, "app:remover", pkg)
     return {"ok": True, "removed": pkg, "store": {"apps": len(scan_apps())}}
@@ -465,10 +574,6 @@ def delete_app(pkg: str, request: Request,
 # --------------------------------------------------------------------------- #
 # admin: publicar firmware OTA (escopo "updates")
 # --------------------------------------------------------------------------- #
-
-def _semver_tuple(v: str) -> tuple:
-    return tuple(int(p) for p in v.split("."))
-
 
 @app.post("/admin/updates/{channel}")
 async def publish_update(

@@ -110,6 +110,7 @@ main {
   border: 1px solid var(--stroke);
   border-radius: 16px;
   padding: clamp(18px, 3.5vw, 30px);
+  scroll-margin-top: 76px; /* ancoras nao somem sob a topbar fixa */
 }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -132,6 +133,38 @@ main {
 
 /* ---------- loja ---------- */
 
+.store-tools {
+  margin-top: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.search {
+  width: 100%;
+  background: var(--raised);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font: inherit;
+}
+.search::placeholder { color: var(--dim); }
+.search:focus { outline: none; border-color: var(--cyan); }
+.cat-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.cat-chip {
+  cursor: pointer;
+  font: inherit; font-size: 0.8rem; font-weight: 700;
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.cat-chip:hover { color: var(--text); border-color: var(--dim); }
+.cat-chip.active {
+  color: var(--cyan);
+  border-color: #3edbf066;
+  background: #3edbf014;
+}
+
 .grid {
   margin-top: 14px;
   display: grid;
@@ -144,7 +177,10 @@ main {
   border: 1px solid var(--stroke);
   border-radius: 12px;
   padding: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
+.app:hover { border-color: #3edbf066; }
 .app-icon img {
   width: 46px; height: 46px; object-fit: contain;
   background: var(--bg2);
@@ -158,6 +194,38 @@ main {
   overflow: hidden;
 }
 .app .meta { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ---------- detalhe do app ---------- */
+
+.detail-head {
+  display: flex; gap: 16px; align-items: flex-start;
+  margin-bottom: 14px;
+}
+.detail-icon img {
+  width: 72px; height: 72px; object-fit: contain;
+  background: var(--bg2);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  padding: 8px;
+}
+.changelog {
+  background: var(--bg2);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 12px 16px;
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+.btn {
+  display: inline-block;
+  font-weight: 700; font-size: 0.9rem;
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  background: var(--raised);
+  border-radius: 10px;
+  padding: 8px 16px;
+}
+.btn:hover { border-color: var(--cyan); text-decoration: none; }
 
 /* ---------- tabelas ---------- */
 
