@@ -68,12 +68,13 @@ DNS (uma vez, no Cloudflare da zona `celer.tec.br`): aponte
 funciona com o Origin Cert existente; sem proxy, entre com um certresolver
 ou Origin Cert próprio do host.
 
-Build + deploy (a tag segue a versão da base python — padrão do datacenter;
-rebuild com a mesma tag + `denv update` re-publica código/conteúdo novo):
+Build + deploy (a TAG é a **versão do hub**, `HUB_VERSION` em `api/app.py` —
+tag nova no registry força build de verdade; subiu a versão? build/deploy com
+a tag nova):
 
 ```bash
-denv start celeros-hub -t 3.12.10     # primeira vez
-denv update celeros-hub -t 3.12.10    # depois de mudar codigo/conteudo
+denv build --service celeros-hub --tag 0.3.0 --push   # build + push da versão
+denv update celeros-hub -t 0.3.0                      # rolling update
 ```
 
 O sync leva `content/` para `/mnt/nfs/celeros-hub/content` (montado rw — a

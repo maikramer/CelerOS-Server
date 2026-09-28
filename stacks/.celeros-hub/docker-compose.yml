@@ -33,7 +33,9 @@ x-deploy-common: &deploy-common
 services:
   hub:
     hostname: hub
-    image: maikramer/celeros-hub:${BASE_TAG:-3.12.10}
+    # Tag = VERSAO do hub (HUB_VERSION em api/app.py) — denv injeta a tag do
+    # deploy em BASE_TAG. Nova versao = nova tag = build novo garantido.
+    image: maikramer/celeros-hub:${BASE_TAG:-0.3.0}
 
     environment:
       - TZ=America/Sao_Paulo
@@ -43,7 +45,6 @@ services:
       - BASE_URL=https://os.celer.tec.br
       - CONTENT_DIR=/data/content
       - AUDIT_DIR=/data/audit
-      - HUB_VERSION=0.2.0
       # Tokens da area admin vem de secrets (NUNCA em environment):
       #   root (acesso total):
       #     printf 'SEU-TOKEN' | docker secret create celeros_hub_admin_token -

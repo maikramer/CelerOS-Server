@@ -1,22 +1,20 @@
 # =============================================================================
 # dockerfile.celeros-hub — imagem custom da stack (fluxo build do denv)
 # =============================================================================
-# Padrao do datacenter: a MESMA tag versiona a base e a imagem produzida.
-# Aqui a base e a imagem oficial do Python, entao:
+# A TAG da imagem e a VERSAO DO SERVICO (HUB_VERSION em api/app.py), nao da
+# base:
 #
-#   denv start celeros-hub -t 3.12.10
-#     1. reescreve ARG BASE_TAG= com 3.12.10
-#     2. docker build -t locatelli/celeros-hub:3.12.10 -f
-#        dockerfile.celeros-hub stacks/.celeros-hub
-#     3. push + deploy interpolando locatelli/celeros-hub:3.12.10
+#   denv build --service celeros-hub --tag 0.3.0 --push
+#   denv update celeros-hub -t 0.3.0
 #
-# Mudou o codigo/conteudo? Rebuild com a mesma tag e `denv update` — o Swarm
-# re-resolve a imagem (--resolve-image always). Mudou a base python? Suba a
-# tag (ex.: 3.13.2) e ajuste o default no docker-compose.yml.
+# Subiu a versao do hub no app.py? Build/deploy com a tag nova — tag que nao
+# existe no registry forca build de verdade (o mesmo tag reescrito deixava o
+# `denv update` pular o build e reimplantar codigo velho). Mudou a base
+# python? Edite o FROM abaixo (fixada de proposito; o denv reescreve o
+# `ARG BASE_TAG` com a tag do deploy, que aqui e so um no-op).
 
-ARG BASE_TAG=3.12.10
-
-FROM python:${BASE_TAG}-alpine
+ARG BASE_TAG=unused
+FROM python:3.12.10-alpine
 
 # Dependencias pinadas (fastapi traz starlette/pydantic; multipart p/ upload).
 RUN pip install --no-cache-dir \

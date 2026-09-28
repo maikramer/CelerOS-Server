@@ -10,11 +10,11 @@
 # stacks/.celeros-hub/. Registro unico na maquina de dev:
 #   denv external add ~/GitClones/CelerOS-Server
 # Deploy (build + push + rolling update):
-#   denv start celeros-hub -t 3.12.10     # 1a vez
-#   denv update celeros-hub -t 3.12.10    # depois de mudar codigo/conteudo
-# A tag acompanha a VERSAO DA BASE python (ver dockerfile.celeros-hub) —
-# padrao do datacenter (mesma tag versiona base e imagem produzida). Rebuild
-# com a mesma tag sobrescreve no registry; o deploy usa --resolve-image always.
+#   denv build --service celeros-hub --tag 0.3.0 --push   # build da versao
+#   denv update celeros-hub -t 0.3.0                      # rolling update
+# A TAG e a VERSAO DO SERVICO (HUB_VERSION em api/app.py): subiu a versao,
+# build/deploy com a tag nova — tag inexistente no registry forca build de
+# verdade (tag reescrita deixava o update pular o build e rodar codigo velho).
 # Git-guard: commit + push antes de deployar (bypass: --no-git-check).
 
 name: celeros-hub
@@ -62,9 +62,9 @@ tags:
 # Imagem custom (fluxo build do denv): tag = versao da base python.
 # -----------------------------------------------------------------------------
 version_pattern: ^\d+\.\d+\.\d+$
-example: 3.12.10
+example: 0.3.0
 registry: maikramer/celeros-hub
-tags_url: https://hub.docker.com/r/library/python/tags
+tags_url: https://hub.docker.com/r/maikramer/celeros-hub/tags
 
 build:
   context: .
