@@ -58,8 +58,11 @@ STATS_DIR = Path(os.environ.get("STATS_DIR", "/data/stats"))
 MAX_UPLOAD = 48 * 1024 * 1024   # teto por upload (firmware ~2 MB; folga p/ zip)
 MAX_UNPACKED = 64 * 1024 * 1024  # teto total descomprimido (anti zip-bomb)
 MAX_BODY = MAX_UPLOAD + 1024 * 1024
-MAX_MAIN_JS = 30 * 1024   # o Net.get do firmware trunca em 32 KB
+MAX_MAIN_JS = 48 * 1024   # download e streaming (Net.download), sem teto de 32KB
 MAX_ICON = 16 * 1024      # PNG 64x64 nao passa de poucos KB; teto folgado
+# Acima disso o app PRECISA declarar api >= 6: firmwares antigos instalavam
+# via Net.get, que trunca o corpo em 32KB (main.js corrompido na instalacao)
+STREAM_SAFE_MAIN_JS = 30 * 1024
 AUTH_FAILS_LIMIT = 10           # falhas de auth...
 AUTH_FAILS_WINDOW = 600         # ...dentro desta janela (s)...
 AUTH_BLOCK_SECS = 900           # ...bloqueiam o IP por este tempo
@@ -498,8 +501,12 @@ async def publish_app(request: Request,
     meta, files = _extract_package(data)
     pkg = _validate_meta(meta)
     if len(files["main.js"]) > MAX_MAIN_JS:
-        raise HTTPException(413, f"main.js tem {len(files['main.js'])} bytes; "
-                                 f"o device trunca em 32 KB (max {MAX_MAIN_JS})")
+        raise HTTPException(413, f"main.js tem {len(files['main.js'])} bytes "
+                                 f"(max {MAX_MAIN_JS})")
+    if len(files["main.js"]) > STREAM_SAFE_MAIN_JS and meta["api"] < 6:
+        raise HTTPException(400, f"main.js > {STREAM_SAFE_MAIN_JS} bytes exige "
+                                 f"api >= 6 no app.json (firmware antigo "
+                                 f"trunca o download em 32KB)")
     if "icon.png" in files:
         if files["icon.png"][:8] != PNG_MAGIC:
             raise HTTPException(400, "icon.png nao e um PNG")

@@ -108,10 +108,11 @@ python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
 
 // campos gerenciados pelo hub (gravados no publish, nao edite):
 // "size", "md5", "published_at", "publisher"</code></pre>
-  <p class="muted">Regras da loja: <code>main.js</code> até <strong>30 KB</strong> (o
-  dispositivo trunca em 32 KB) e <code>icon.png</code> até <strong>16 KB</strong>.
-  Quem publica primeiro um <code>packageName</code> vira o <strong>dono</strong> —
-  só o dono (ou o hub) atualiza/remove. Versão nova tem que ser
+  <p class="muted">Regras da loja: <code>main.js</code> até <strong>48 KB</strong> —
+  apps acima de <strong>30 KB</strong> precisam declarar <code>api: 6</code>
+  (firmware antigo truncava o download em 32 KB) — e <code>icon.png</code> até
+  <strong>16 KB</strong>. Quem publica primeiro um <code>packageName</code> vira o
+  <strong>dono</strong> — só o dono (ou o hub) atualiza/remove. Versão nova tem que ser
   <strong>maior</strong> que a publicada; republicar a mesma exige
   <code>--force</code>. O device valida o <code>md5</code> depois de baixar.</p>
   <p class="muted">Endpoints: <code>GET /store/index.json</code> ·

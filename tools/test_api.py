@@ -165,10 +165,19 @@ def main() -> None:
                    .status_code == 200, "raiz remove")
 
             print("limites de tamanho")
-            big = b"//" + b"x" * (31 * 1024)
-            expect(publish(c, "tok-dev1", meta_of("celeros.big"),
-                           main_js=big).status_code == 413,
-                   "main.js > 30 KB -> 413")
+            big31 = b"//" + b"x" * (31 * 1024)
+            big49 = b"//" + b"x" * (49 * 1024)
+            expect(publish(c, "tok-dev1", meta_of("celeros.big31"),
+                           main_js=big31).status_code == 400,
+                   "main.js > 30 KB com api < 6 -> 400")
+            expect(publish(c, "tok-dev1", meta_of("celeros.big31api6", "1.0.0",
+                                                  api=6),
+                           main_js=big31).status_code == 200,
+                   "main.js > 30 KB com api 6 -> 200")
+            expect(publish(c, "tok-dev1", meta_of("celeros.big49", "1.0.0",
+                                                  api=6),
+                           main_js=big49).status_code == 413,
+                   "main.js > 48 KB -> 413")
             expect(publish(c, "tok-dev1", meta_of("celeros.iconbig"),
                            icon=PNG + b"0" * 17 * 1024).status_code == 413,
                    "icon.png > 16 KB -> 413")

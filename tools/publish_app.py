@@ -24,7 +24,8 @@ from pathlib import Path
 from urllib import error, request
 
 REQUIRED = ("name", "packageName", "version", "author", "description")
-MAX_MAIN_JS = 30 * 1024  # mesmo teto do servidor (device trunca em 32 KB)
+MAX_MAIN_JS = 48 * 1024        # mesmo teto do servidor (download e streaming)
+STREAM_SAFE_MAIN_JS = 30 * 1024  # acima disso o app precisa declarar api >= 6
 
 
 def die(msg: str) -> None:
@@ -61,8 +62,11 @@ def main() -> None:
     if not re.match(r"^\d+\.\d+\.\d+$", meta["version"]):
         die("version deve ser semver x.y.z")
     if code_path.stat().st_size > MAX_MAIN_JS:
-        die(f"main.js tem {code_path.stat().st_size} bytes; "
-            f"o device trunca em 32 KB (max {MAX_MAIN_JS})")
+        die(f"main.js tem {code_path.stat().st_size} bytes (max {MAX_MAIN_JS})")
+    if code_path.stat().st_size > STREAM_SAFE_MAIN_JS \
+            and int(meta.get("api") or 1) < 6:
+        die(f"main.js > {STREAM_SAFE_MAIN_JS} bytes exige api >= 6 no app.json "
+            f"(firmware antigo trunca o download em 32KB)")
 
     token = args.token
     if not token:
