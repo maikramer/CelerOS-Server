@@ -11,5 +11,9 @@
   "system": true,
   "order": 10,
   "icon": "appstore",
-  "topbar": true
+  "topbar": true,
+  "size": 42738,
+  "md5": "06bf6458b969513a8b94b23d5ba83149",
+  "published_at": "2026-09-28T04:49:20Z",
+  "publisher": "maikeu"
 }

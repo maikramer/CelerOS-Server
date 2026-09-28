@@ -7,5 +7,9 @@
   "type": "Game",
   "category": "Arcade",
   "api": 3,
-  "changelog": "1.1.0 - botao Desfazer (1 passo) e recorde destacado ao vivo; 1.0.0 - primeiro lancamento"
+  "changelog": "1.1.0 - botao Desfazer (1 passo) e recorde destacado ao vivo; 1.0.0 - primeiro lancamento",
+  "size": 8304,
+  "md5": "5a76e324f250bf3003dfef80edd5b05a",
+  "published_at": "2026-09-28T04:49:20Z",
+  "publisher": "maikeu"
 }

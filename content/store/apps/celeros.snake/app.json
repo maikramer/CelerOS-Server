@@ -7,5 +7,9 @@
   "type": "Game",
   "category": "Arcade",
   "api": 3,
-  "changelog": "1.1.0 - placar fino, contagem 3-2-1 e recorde destacado ao vivo; 1.0.0 - primeiro lancamento"
+  "changelog": "1.1.0 - placar fino, contagem 3-2-1 e recorde destacado ao vivo; 1.0.0 - primeiro lancamento",
+  "size": 7277,
+  "md5": "8d1b6d77b035c119ec7a5a61e2b87e90",
+  "published_at": "2026-09-28T04:49:20Z",
+  "publisher": "maikeu"
 }
