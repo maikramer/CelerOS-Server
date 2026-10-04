@@ -50,7 +50,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.4.0"
+HUB_VERSION = "0.5.0"
 BASE_URL = os.environ.get("BASE_URL", "https://os.celer.tec.br").rstrip("/")
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "/data/content"))
 AUDIT_DIR = Path(os.environ.get("AUDIT_DIR", "/data/audit"))
@@ -69,6 +69,17 @@ MAX_ICON = 16 * 1024      # PNG 64x64 nao passa de poucos KB; teto folgado
 # Acima disso o app PRECISA declarar api >= 6: firmwares antigos instalavam
 # via Net.get, que trunca o corpo em 32KB (main.js corrompido na instalacao)
 STREAM_SAFE_MAIN_JS = 30 * 1024
+# Pacote multi-arquivo (modulos .js + assets): FLAT, sem subpastas. Modulos
+# entram na soma do teto de compile; assets (nao-.js) tem tetos proprios —
+# nao passam pelo Duktape, custam so espaco em disco. O publish computa o
+# campo gerenciado "files" {nome: {size, md5}} (viaja no app.json e no
+# catalogo) para a loja instalar e verificar tudo. Mesmo contrato do
+# celerhub.py.
+ASSET_EXTS = (".js", ".png", ".wav", ".json", ".bin")
+FILE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+MAX_ASSET_FILE = 128 * 1024    # por arquivo extra
+MAX_ASSETS_TOTAL = 256 * 1024  # soma dos extras nao-.js
+MAX_EXTRA_FILES = 16           # arquivos alem de app.json/main.js/icon.png
 AUTH_FAILS_LIMIT = 10           # falhas de auth...
 AUTH_FAILS_WINDOW = 600         # ...dentro desta janela (s)...
 AUTH_BLOCK_SECS = 900           # ...bloqueiam o IP por este tempo
@@ -352,6 +363,10 @@ def catalog_categories() -> dict[str, dict]:
         # e o bloqueio de install em placa sem PSRAM.
         if meta.get("requires"):
             entry["requires"] = list(meta["requires"])
+        # Manifesto multi-arquivo {nome: {size, md5}}: a loja instala e
+        # verifica cada um; clientes antigos ignoram o campo.
+        if meta.get("files"):
+            entry["files"] = meta["files"]
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
         cats.setdefault(slug, {"name": cat, "apps": {}})
@@ -473,7 +488,10 @@ def _validate_meta(meta: dict) -> dict:
 
 
 def _extract_package(data: bytes) -> tuple[dict, dict[str, bytes]]:
-    """Zip do pacote -> (app.json, {arquivo: bytes})."""
+    """Zip do pacote -> (app.json, {arquivo: bytes}).
+
+    Flat: aceita pasta raiz ou arquivos soltos. Nome invalido ou colisao de
+    basename e rejeitado na hora (antes o ultimo ganhava em silencio)."""
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -481,10 +499,17 @@ def _extract_package(data: bytes) -> tuple[dict, dict[str, bytes]]:
     total = sum(i.file_size for i in zf.infolist())
     if total > MAX_UNPACKED:
         raise HTTPException(413, "conteudo descomprimido grande demais")
-    names = [n for n in zf.namelist() if not n.endswith("/")]
-    flat = {}
-    for n in names:
-        flat[Path(n).name] = zf.read(n)  # aceita pasta raiz ou arquivos soltos
+    flat: dict[str, bytes] = {}
+    for n in zf.namelist():
+        if n.endswith("/"):
+            continue
+        base = Path(n).name
+        if not FILE_NAME.match(base):
+            raise HTTPException(400, f"nome de arquivo invalido: {base} "
+                                     f"([A-Za-z0-9._-], ate 64 chars)")
+        if base in flat:
+            raise HTTPException(400, f"arquivo duplicado no pacote: {base}")
+        flat[base] = zf.read(n)
     if "app.json" not in flat or "main.js" not in flat:
         raise HTTPException(400, "pacote precisa conter app.json e main.js")
     meta = None
@@ -515,12 +540,41 @@ async def publish_app(request: Request,
         raise HTTPException(413, "pacote grande demais")
     meta, files = _extract_package(data)
     pkg = _validate_meta(meta)
-    if len(files["main.js"]) > MAX_MAIN_JS_PSRAM:
-        raise HTTPException(413, f"main.js tem {len(files['main.js'])} bytes "
-                                 f"(max {MAX_MAIN_JS_PSRAM})")
-    if len(files["main.js"]) > MAX_MAIN_JS and "psram" not in (meta.get("requires") or []):
-        raise HTTPException(400, f"main.js tem {len(files['main.js'])} bytes: acima "
-                                 f"de {MAX_MAIN_JS} exige \"psram\" em requires no "
+    # Teto em 2 niveis pela SOMA dos .js (main.js + modulos): e a soma que
+    # ocupa a RAM de compile no device. Assets (nao-.js) tem tetos proprios
+    # — nao passam pelo Duktape, custam so espaco em disco.
+    extras = {n: b for n, b in files.items()
+              if n not in ("app.json", "main.js", "icon.png")}
+    if len(extras) > MAX_EXTRA_FILES:
+        raise HTTPException(400, f"pacote com {len(extras)} arquivos extras "
+                                 f"(max {MAX_EXTRA_FILES})")
+    js_sum = len(files["main.js"])
+    assets_total = 0
+    for n, b in extras.items():
+        if Path(n).suffix.lower() not in ASSET_EXTS:
+            raise HTTPException(400, f"arquivo extra invalido: {n} (extensoes: "
+                                     f"{', '.join(ASSET_EXTS)})")
+        if len(b) > MAX_ASSET_FILE:
+            raise HTTPException(413, f"{n} tem {len(b)} bytes "
+                                     f"(max {MAX_ASSET_FILE})")
+        if n.endswith(".js"):
+            js_sum += len(b)
+            if len(b) > STREAM_SAFE_MAIN_JS and meta["api"] < 6:
+                raise HTTPException(400, f"{n} > {STREAM_SAFE_MAIN_JS} bytes exige "
+                                         f"api >= 6 no app.json (firmware antigo "
+                                         f"trunca o download em 32KB)")
+        else:
+            assets_total += len(b)
+    if assets_total > MAX_ASSETS_TOTAL:
+        raise HTTPException(413, f"assets somam {assets_total} bytes "
+                                 f"(max {MAX_ASSETS_TOTAL})")
+    psram_decl = "psram" in (meta.get("requires") or [])
+    if js_sum > MAX_MAIN_JS_PSRAM:
+        raise HTTPException(413, f"soma dos .js ({js_sum} bytes) acima do teto "
+                                 f"absoluto ({MAX_MAIN_JS_PSRAM})")
+    if js_sum > MAX_MAIN_JS and not psram_decl:
+        raise HTTPException(400, f"soma dos .js ({js_sum} bytes): acima de "
+                                 f"{MAX_MAIN_JS} exige \"psram\" em requires no "
                                  f"app.json (sem PSRAM a RAM interna nao fecha o "
                                  f"compile)")
     if len(files["main.js"]) > STREAM_SAFE_MAIN_JS and meta["api"] < 6:
@@ -561,10 +615,20 @@ async def publish_app(request: Request,
     meta["md5"] = hashlib.md5(main_blob).hexdigest()
     meta["published_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     meta["publisher"] = agent.name
-    if main_blob:
-        (staging / "main.js").write_bytes(main_blob)
+    # manifesto multi-arquivo: {nome: {size, md5}} de cada extra. Pacote sem
+    # extras limpa o campo (update que removeu modulos/assets nao deixa lixo
+    # no catalogo).
+    if extras:
+        meta["files"] = {n: {"size": len(b),
+                             "md5": hashlib.md5(b).hexdigest()}
+                         for n, b in sorted(extras.items())}
+    else:
+        meta.pop("files", None)
+    (staging / "main.js").write_bytes(main_blob)
     if "icon.png" in files:
         (staging / "icon.png").write_bytes(files["icon.png"])
+    for n, b in extras.items():
+        (staging / n).write_bytes(b)
     (staging / "app.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not (staging / "app.json").exists() or not (staging / "main.js").exists():
