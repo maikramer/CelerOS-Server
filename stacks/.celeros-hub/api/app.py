@@ -27,7 +27,10 @@
 #     republicacao/remocao por nao-dono. Downloads de main.js sao contados
 #     em STATS_DIR/downloads.json e expostos em /api/info.
 #   - OTA: rejeita versao MENOR que a atual do canal (anti-rollback; force=1
-#     para excecao) e grava firmware_sha256 no manifest.
+#     para excecao) e grava firmware_sha256 no manifest. api_version e
+#     validado (1..999; default = FIRMWARE_API_LEVEL — o device recusa
+#     manifest abaixo do nivel dele) e variant de SKU tambem (ex.:
+#     "smartdisplay-y8"; device Y recusa manifest sem a sua variante).
 #   - /api/docs desligado por padrao (HUB_DOCS=1 para ligar em dev).
 #
 # O catalogo e gerado NA ROTA a partir do scan de content/store/apps/ (o disco
@@ -50,7 +53,44 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.5.0"
+HUB_VERSION = "0.6.0"
+# Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
+# main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
+# manifest sem api_version ou com nivel abaixo do dele — apps instalados
+# que exigem API maior parariam de rodar — entao o default do publish e o
+# nivel vigente (o antigo default 2 publicava manifest que todo device
+# atual recusava).
+FIRMWARE_API_LEVEL = 22
+# Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
+# portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
+# canais beta/extra seguem publicaveis.
+BOARDS = {
+    "esp32": {
+        "name": "CYD 2.8\"",
+        "desc": "ESP32 classico 320x240 sem PSRAM (ESP32-2432S028R e afins;"
+                " inclui a variante VSPI)",
+    },
+    "smartdisplay_4848S040": {
+        "name": "SmartDisplay 4\"",
+        "desc": "ESP32-S3 480x480 com PSRAM; a variante Y (reles) exige"
+                " manifest com variant proprio",
+    },
+    "waveshare_amoled206": {
+        "name": "Watch AMOLED 2.06\"",
+        "desc": "Waveshare ESP32-S3R8 de pulso: watchfaces, Phone Link e"
+                " deep sleep com sentinela ULP",
+    },
+    "spotpear_zzpet": {
+        "name": "Cao robotico (ZZPET)",
+        "desc": "SpotBear/ZZPET ESP32-S3R8: wake word \"hi celer\" e comandos"
+                " de voz em portugues/ingles",
+    },
+    "devkit": {
+        "name": "Devkit barebone",
+        "desc": "ESP32 4MB sem tela (LED + botao BOOT) para apps de"
+                " sensor/atuador",
+    },
+}
 BASE_URL = os.environ.get("BASE_URL", "https://os.celer.tec.br").rstrip("/")
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "/data/content"))
 AUDIT_DIR = Path(os.environ.get("AUDIT_DIR", "/data/audit"))
@@ -88,6 +128,7 @@ STARTED_AT = time.time()
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PKG_NAME = re.compile(r"^[a-z0-9]+(\.[a-z0-9]+)+$")  # ex.: celeros.demo
 CHANNEL = re.compile(r"^[a-z0-9_.-]+$")
+VARIANT = re.compile(r"^[a-z0-9][a-z0-9.-]{0,31}$")  # ex.: smartdisplay-y8
 SLUG = re.compile(r"^[a-z0-9_-]+$")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -442,22 +483,28 @@ def info():
             if doc:
                 updates[ch.name] = {
                     "version": doc.get("version"),
+                    "api_version": doc.get("api_version"),
+                    "variant": doc.get("variant") or "",
                     "hasFirmware": (ch / "firmware.bin").exists(),
                     "updated": time.strftime(
                         "%Y-%m-%dT%H:%M:%SZ",
                         time.gmtime((ch / "update.json").stat().st_mtime)),
                 }
+    stats = _load_stats()
     return {
         "service": "celeros-hub",
         "version": HUB_VERSION,
         "base_url": BASE_URL,
         "uptime_s": int(time.time() - STARTED_AT),
+        "firmware": {"api_level": FIRMWARE_API_LEVEL},
+        "boards": BOARDS,
         "store": {
             "apps": len(apps),
             "categories": sorted({
                 str(m.get("category") or "Apps") for m in apps.values()}),
         },
-        "downloads": dict(sorted(_load_stats().items())),
+        "downloads": dict(sorted(stats.items())),
+        "downloads_total": sum(stats.values()),
         "updates": updates,
     }
 
@@ -689,7 +736,29 @@ async def publish_update(
         meta.setdefault(f, "")
     for f in ("major_update", "minor_update", "security_update"):
         meta[f] = bool(meta.get(f))
-    meta.setdefault("api_version", 2)
+    # api_version: o device RECUSA manifest sem o campo ou abaixo do nivel
+    # dele (parser do OtaManager: max 3 digitos). Default = nivel vigente.
+    raw_api = meta.get("api_version")
+    if raw_api is None or raw_api == "":
+        api_version = FIRMWARE_API_LEVEL
+    else:
+        try:
+            api_version = int(raw_api)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "api_version deve ser inteiro")
+        if not 1 <= api_version <= 999:
+            raise HTTPException(400, "api_version deve ser 1..999")
+    meta["api_version"] = api_version
+    # Variante de SKU (ex.: SmartDisplay Y com reles, "smartdisplay-y8"):
+    # device com reles recusa manifest sem a SUA variante; device padrao
+    # aceita qualquer um — distribuir imagem de variante em canal proprio
+    # para nao alcancar aparelho padrao.
+    variant = str(meta.get("variant") or "")
+    if variant:
+        if not VARIANT.match(variant):
+            raise HTTPException(400, "variant invalido (ex.: smartdisplay-y8)")
+    else:
+        meta.pop("variant", None)
 
     # anti-rollback: nunca publica versao menor que a atual do canal
     dest = CONTENT_DIR / "updates" / channel
@@ -718,11 +787,18 @@ async def publish_update(
         tmp = dest / "firmware.bin.tmp"
         tmp.write_bytes(blob)
         tmp.rename(dest / "firmware.bin")  # atomica: nunca expõe bin pela metade
+    else:
+        # manifest-only: o manifest e a fonte da verdade do canal. Bin nao
+        # referenciado (firmware_url ausente) sai do disco — senao o
+        # /api/info mentia hasFirmware e sobraria bin de versao anterior.
+        (dest / "firmware.bin").unlink(missing_ok=True)
     (dest / "update.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     audit(request, agent, "ota:publicar", f"{channel}@{meta['version']}",
           err="" if has_bin else "manifest-only")
     return {"ok": True, "channel": channel, "version": meta["version"],
+            "api_version": meta["api_version"],
+            "variant": meta.get("variant", ""),
             "firmware": has_bin,
             "sha256": meta.get("firmware_sha256"),
             "url": f"{BASE_URL}/updates/{channel}/update.json"}

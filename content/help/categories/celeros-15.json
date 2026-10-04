@@ -1,0 +1,16 @@
+{
+  "articles": [
+    {
+      "title": "IA no aparelho",
+      "url": "https://os.celer.tec.br/help/articles/ia-no-aparelho.json"
+    },
+    {
+      "title": "Voz e comandos",
+      "url": "https://os.celer.tec.br/help/articles/voz-e-comandos.json"
+    },
+    {
+      "title": "Phone Link e watchfaces",
+      "url": "https://os.celer.tec.br/help/articles/phone-link-e-watchfaces.json"
+    }
+  ]
+}

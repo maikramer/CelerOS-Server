@@ -11,6 +11,10 @@ Cobre o contrato do fluxo de ATUALIZACAO de apps:
   - pacote multi-arquivo: extras gravados/servidos, campo gerenciado "files",
     colisao de nome, extensao invalida, tetos de asset/contagem
   - contador de downloads em /api/info
+OTA:
+  - publish grava api_version (default = nivel vigente do firmware) e
+    firmware_sha256; variant validado e exposto; /api/info traz boards/
+    firmware.api_level/updates com api_version+variant; anti-rollback 409
 
 Uso (precisa de fastapi + httpx no interpretador):
     python3 tools/test_api.py
@@ -75,6 +79,20 @@ def publish(client, token, pkg_meta, main_js=b"console.log('oi');\n",
         data={"force": force})
 
 
+def publish_ota(client, token, channel, meta, firmware: bytes | None = None,
+                force=""):
+    files = {}
+    if firmware is not None:
+        files["firmware"] = ("firmware.bin", firmware,
+                             "application/octet-stream")
+    return client.post(
+        f"/admin/updates/{channel}",
+        headers={"Authorization": f"Bearer {token}"},
+        files=files,
+        data={"update.json": json.dumps(meta, ensure_ascii=False),
+              "force": force})
+
+
 def main() -> None:
     from fastapi.testclient import TestClient
 
@@ -89,6 +107,7 @@ def main() -> None:
         tokens.write_text(json.dumps([
             {"name": "dev1", "token": "tok-dev1", "scopes": ["apps"]},
             {"name": "dev2", "token": "tok-dev2", "scopes": ["apps"]},
+            {"name": "ci-fw", "token": "tok-ci", "scopes": ["updates"]},
         ]), encoding="utf-8")
 
         os.environ["CONTENT_DIR"] = str(content)
@@ -281,6 +300,68 @@ def main() -> None:
                            extras={f"m{i:02d}.js": b"1" for i in range(17)}
                            ).status_code == 400,
                    "17 arquivos extras -> 400")
+
+            print("OTA: manifest, api_version e variant")
+            ota = lambda ver, **kw: {  # noqa: E731
+                "version": ver, "changelog": f"{ver} - teste", **kw}
+            blob = b"firmware-fake" + b"\x00" * 1024
+            r = publish_ota(c, "tok-ci", "esp32", ota("1.2.0"), firmware=blob)
+            expect(r.status_code == 200,
+                   f"publish OTA 200 (veio {r.status_code}: {r.text[:120]})")
+            expect(r.json().get("api_version") == hubapi.FIRMWARE_API_LEVEL,
+                   "api_version default = nivel vigente do firmware")
+            expect(r.json().get("sha256") == hashlib.sha256(blob).hexdigest(),
+                   "sha256 do firmware na resposta")
+            disk = json.loads(
+                (content / "updates/esp32/update.json").read_text())
+            expect(disk.get("api_version") == hubapi.FIRMWARE_API_LEVEL and
+                   disk.get("firmware_sha256") == r.json()["sha256"],
+                   "update.json gravado com api_version/sha256")
+            expect((content / "updates/esp32/firmware.bin").read_bytes()
+                   == blob, "firmware.bin gravado integro")
+            r = publish_ota(c, "tok-ci", "esp32", ota("1.1.0"))
+            expect(r.status_code == 409, "rollback OTA (versao menor) -> 409")
+            r = publish_ota(c, "tok-ci", "esp32", ota("1.1.0"), force="1")
+            expect(r.status_code == 200 and not r.json()["firmware"],
+                   "force=1 publica manifest-only abaixo da versao")
+            expect(not (content / "updates/esp32/firmware.bin").exists(),
+                   "manifest-only remove firmware.bin do canal")
+            r = publish_ota(c, "tok-ci", "esp32",
+                            ota("1.2.1", variant="smartdisplay-y8"))
+            expect(r.status_code == 200 and
+                   r.json().get("variant") == "smartdisplay-y8",
+                   "variant de SKU aceito e ecoado")
+            expect(publish_ota(c, "tok-ci", "esp32",
+                               ota("1.2.2", variant="Y8!")).status_code == 400,
+                   "variant invalido -> 400")
+            expect(publish_ota(c, "tok-ci", "esp32",
+                               ota("1.2.3", api_version=0)).status_code == 400,
+                   "api_version 0 -> 400 (device recusa)")
+            expect(publish_ota(c, "tok-ci", "esp32",
+                               ota("1.2.4", api_version="x")).status_code
+                   == 400, "api_version nao-inteiro -> 400")
+            expect(publish_ota(c, "tok-ci", "esp32",
+                               ota("1.2.5", api_version=30)).status_code == 200,
+                   "api_version explicito (30) passa")
+            info = c.get("/api/info").json()
+            expect(info["updates"]["esp32"].get("api_version") == 30 and
+                   info["updates"]["esp32"].get("variant") == "",
+                   "/api/info traz api_version/variant do canal")
+            expect(info.get("firmware", {}).get("api_level")
+                   == hubapi.FIRMWARE_API_LEVEL,
+                   "/api/info expoe firmware.api_level")
+            expect(isinstance(info.get("boards"), dict) and
+                   "smartdisplay_4848S040" in info["boards"],
+                   "/api/info expoe o mapa de placas")
+            expect(info.get("downloads_total", -1) ==
+                   sum(info["downloads"].values()),
+                   "/api/info traz downloads_total consistente")
+            expect(publish_ota(c, "tok-dev1", "esp32",
+                               ota("9.9.9")).status_code == 403,
+                   "token sem escopo updates -> 403")
+            expect(c.delete("/admin/updates/esp32",
+                            headers={"Authorization": "Bearer tok-ci"})
+                   .status_code == 200, "remocao de canal OTA")
 
             print("sem token / escopo")
             expect(c.post("/admin/apps").status_code in (401, 403),

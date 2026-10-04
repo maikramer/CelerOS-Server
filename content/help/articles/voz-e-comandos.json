@@ -1,0 +1,3 @@
+{
+  "content": "O microfone esta disponivel para os apps pela API Mic (requer a permissao mic, concedida na primeira vez que o app pede). A gravacao sai em WAV 16 kHz, pronta para modelos de voz.\n\nO app Qwen e um assistente push-to-talk: segure o botao, fale, solte, e a resposta volta como texto na tela.\n\nNo cao robotico (ZZPET) existe tambem o detector de wake word na propria placa: fale \"hi celer, senta\" (ou os comandos sit, down, stand, walk e stop, em portugues ou ingles) perto do cachorro que ele obedece — funciona offline, sem internet."
+}

@@ -130,12 +130,21 @@ main {
   white-space: nowrap;
 }
 .pill.dim { color: var(--dim); background: none; border-color: var(--stroke); }
+.pill.warn {
+  color: #ffce6b; background: #ffce6b14; border-color: #ffce6b44;
+}
 
 /* ---------- loja ---------- */
 
 .store-tools {
   margin-top: 14px;
   display: flex; flex-direction: column; gap: 10px;
+}
+.store-row { display: flex; gap: 10px; }
+.store-row .search { flex: 1; }
+.select {
+  width: auto; min-width: 170px;
+  cursor: pointer;
 }
 .search {
   width: 100%;
@@ -188,12 +197,14 @@ main {
   padding: 5px;
 }
 .app h3 { margin: 0 0 2px; font-size: 1.02rem; }
+.app-body { display: flex; flex-direction: column; flex: 1; }
 .app .desc {
   margin: 0; color: var(--dim); font-size: 0.86rem;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.app .meta { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+/* pills grudam no rodape: cards da mesma linha ficam uniformes */
+.app .meta { margin-top: auto; padding-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ---------- detalhe do app ---------- */
 
@@ -227,6 +238,66 @@ main {
 }
 .btn:hover { border-color: var(--cyan); text-decoration: none; }
 
+/* ---------- placas ---------- */
+
+.boards {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.board {
+  background: var(--raised);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.board-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.board h3 { margin: 0; font-size: 1.02rem; }
+.board .desc { margin: 6px 0 0; color: var(--dim); font-size: 0.88rem; }
+.board .meta {
+  margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;
+  align-items: center; font-size: 0.82rem;
+}
+
+/* ---------- features do CelerOS ---------- */
+
+.features {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.feat {
+  background: var(--raised);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.feat h3 { margin: 0 0 6px; font-size: 1rem; }
+.feat p { margin: 0; color: var(--dim); font-size: 0.88rem; }
+
+/* ---------- ajuda ---------- */
+
+#help-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.help-cat {
+  background: var(--raised);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.help-cat h3 {
+  margin: 0 0 8px; font-size: 0.85rem; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--dim);
+}
+
 /* ---------- tabelas ---------- */
 
 .tbl { width: 100%; border-collapse: collapse; margin-top: 12px; }
@@ -238,6 +309,20 @@ main {
 }
 .tbl td { padding: 10px; border-bottom: 1px solid #24325e55; vertical-align: top; }
 .tbl tr:last-child td { border-bottom: none; }
+
+/* tabela OTA: layout fixo p/ "Canal" nao inflar com canal longo e
+   "Novidades" nao virar 8 linhas */
+#fw-table { table-layout: fixed; }
+#fw-table code { font-size: 0.78em; }
+#fw-table th:nth-child(1) { width: 22%; }
+#fw-table th:nth-child(2) { width: 17%; }
+#fw-table th:nth-child(3) { width: 8%; }
+#fw-table th:nth-child(4) { width: 5%; }
+#fw-table th:nth-child(5) { width: 12%; }
+#fw-table th:nth-child(6) { width: 10%; }
+#fw-table td:nth-child(2) { white-space: nowrap; }
+#fw-table td:first-child code { word-break: break-all; }
+#fw-table td:last-child { overflow-wrap: anywhere; }
 
 .links { margin: 8px 0 0; padding: 0; list-style: none; }
 .links li { padding: 4px 0; }
@@ -253,5 +338,10 @@ footer {
 
 @media (max-width: 560px) {
   .topbar { flex-direction: column; gap: 6px; }
-  .tbl th:nth-child(3), .tbl td:nth-child(3) { display: none; }
+  .store-row { flex-direction: column; }
+  .store-row .select { width: 100%; }
+  /* tabela OTA: mantem canal/versao/binario; esconde o resto */
+  .tbl th:nth-child(2), .tbl td:nth-child(2),
+  .tbl th:nth-child(4), .tbl td:nth-child(4),
+  .tbl th:nth-child(5), .tbl td:nth-child(5) { display: none; }
 }

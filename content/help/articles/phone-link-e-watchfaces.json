@@ -1,0 +1,3 @@
+{
+  "content": "No relogio (Waveshare AMOLED 2.06), o Phone Link conecta com o celular pelo app Gadgetbridge (Android, codigo aberto): notificacoes, controle de musica, previsao do tempo e chamadas chegam no pulso pela API Phone.\n\nO rosto do relogio e um plugin: arquivos watchface.js trocam a aparencia da tela inicial sem reflashing. Relogios podem instalar watchfaces pela loja como se fossem apps.\n\nO relogio tambem dorme sozinho quando voce para de usa-lo: o botao PWR responde em ~100 ms e levantar o pulso acorda a tela."
+}

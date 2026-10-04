@@ -1,0 +1,3 @@
+{
+  "content": "A partir da API 18, qualquer app pode conversar com uma IA pelo AI.chat(). O CelerOS fala direto com DeepSeek ou OpenRouter por HTTPS, sem servidor intermediario, e o app Chat IA (ja instalado) e um cliente completo de conversa.\n\nCom function calling, o modelo pode responder chamando funcoes do seu app: ele devolve toolCalls e o codigo do app executa a acao no aparelho.\n\nA chave da IA fica FORA do sandbox de JavaScript, no lado nativo do sistema. Nenhum app le a chave. Para provisionar a sua, use o celerctl no computador (tools/push_ai_key.py no repo do CelerOS)."
+}

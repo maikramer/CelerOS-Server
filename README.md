@@ -27,7 +27,8 @@ CelerOS-Server/
 ├── content/                      # conteúdo servido (sincronizado ao NFS)
 │   ├── www/                      # portal (index.html + assets de marca)
 │   ├── store/apps/<pkg>/         # pacotes: app.json + main.js [+ icon.png]
-│   ├── updates/<canal>/          # esp32 | smartdisplay_4848S040 (+beta)
+│   ├── updates/<canal>/          # esp32 | smartdisplay_4848S040 |
+│   │                             # waveshare_amoled206 | spotpear_zzpet | devkit
 │   └── help/                     # index -> categorias -> artigos
 ├── branding/                     # artes originais (fonte da marca)
 └── tools/                        # CLIs de publicação e manutenção
@@ -89,12 +90,20 @@ Token: `--token` ou `export CELER_HUB_TOKEN=...` (o mesmo do secret).
 # app (pasta com app.json + main.js [+ icon.png])
 python3 tools/publish_app.py minha-pasta-do-app --token $CELER_HUB_TOKEN
 
-# firmware OTA
-python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
-  --version 1.3.0 --changelog "- novidade" --token $CELER_HUB_TOKEN
-python3 tools/publish_firmware.py smartdisplay_4848S040 build-smartdisplay/KryonOS.bin \
-  --version 1.3.0 --changelog "- novidade" --token $CELER_HUB_TOKEN
+# firmware OTA — canal da placa:
+#   esp32 (CYD) | smartdisplay_4848S040 | waveshare_amoled206 (watch)
+#   spotpear_zzpet (cão) | devkit (barebone)
+python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
+  --version 1.5.0 --changelog "- novidade" --token $CELER_HUB_TOKEN
+
+# SmartDisplay Y (relés): imagem da variante em canal próprio + --variant
+python3 tools/publish_firmware.py smartdisplay-y build-y/CelerOS.bin \
+  --version 1.5.0 --variant smartdisplay-y8 --token $CELER_HUB_TOKEN
 ```
+
+O `--api-version` do firmware tem default no hub (o nível atual, `FIRMWARE_API_LEVEL`
+em `api/app.py` — hoje 22, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
+dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele.
 
 Catálogo semente vindo do upstream (KryonOS-AppStore), uma vez:
 
@@ -177,9 +186,13 @@ um token — útil no CI.
   extras (name/version/author/... na entrada) são ignorados pelo cliente e
   usados pelo portal.
 - **OTA v2** (cliente: `main/OTA/OtaManager.cpp`): `update.json` com
-  `version`, `api_version`, flags `major/minor/security_update`, `changelog`,
-  `guide`, `firmware_url` (relativa resolve contra o diretório do manifest).
-  Instala só se `version` > versão gravada no dispositivo.
+  `version`, `api_version` (validada pelo hub: 1..999, default = nível atual
+  — o device **recusa** manifest abaixo do próprio nível), flags
+  `major/minor/security_update`, `changelog`, `guide`, `variant` de SKU
+  (ex.: `smartdisplay-y8`; device com relés recusa manifest sem a própria
+  variante — publique imagem de variante em canal próprio) e `firmware_url`
+  (relativa resolve contra o diretório do manifest). Instala só se `version`
+  > versão gravada no dispositivo.
 - **Ajuda** (cliente: `data/apps/Help/main.js`): `index.json`
   `{categories:[{name,url}]}` → `{articles:[{title,url}]}` → `{content}`.
   Textos SEM acentos: a fonte do dispositivo não tem glifos acentuados.
@@ -187,8 +200,11 @@ um token — útil no CI.
 ## Validado
 
 - Fluxo completo do cliente simulado (index → categorias → meta → main.js)
-  com 19 apps em 6 categorias; ajuda (2 categorias, 6 artigos); OTA dos dois
+  com 19 apps em 6 categorias; ajuda (3 categorias, 9 artigos); OTA dos dois
   canais; `/health` e `/api/info` (consumidos pelo denv).
 - Publish de app e firmware via CLI (multipart), DELETE de app/canal, 403 sem
   token, atomicidade do `firmware.bin` (write→rename).
-- Portal renderizado e conferido no navegador (loja/OTA/ajuda/devs).
+- `tools/test_api.py`: 67 checks via TestClient (apps, multi-arquivo, limites,
+  downloads, OTA — api_version/variant/anti-rollback).
+- Portal renderizado e conferido no navegador (loja/placas/firmware/CelerOS/
+  ajuda/devs).

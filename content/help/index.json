@@ -7,6 +7,10 @@
     {
       "name": "Loja e apps",
       "url": "https://os.celer.tec.br/help/categories/loja-e-apps.json"
+    },
+    {
+      "name": "CelerOS 1.5",
+      "url": "https://os.celer.tec.br/help/categories/celeros-15.json"
     }
   ]
 }

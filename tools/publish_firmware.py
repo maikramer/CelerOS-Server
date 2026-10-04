@@ -6,13 +6,17 @@ O servidor grava content/updates/<canal>/{firmware.bin,update.json}; o
 update.json segue o esquema v2 que o OtaManager do dispositivo le, com
 firmware_url relativa ("firmware.bin").
 
-Canais das placas: esp32 (CYD) e smartdisplay_4848S040 (SmartDisplay 4").
+Canais das placas (main/Boards/<placa>/Board.cpp do CelerOS):
+  esp32 (CYD 2.8") | smartdisplay_4848S040 (SmartDisplay 4") |
+  waveshare_amoled206 (Watch AMOLED 2.06") | spotpear_zzpet (cao ZZPET) |
+  devkit (barebone sem tela)
 Token: --token ou env CELER_HUB_TOKEN.
 
 Uso:
     python3 tools/publish_firmware.py esp32 build-cyd/KryonOS.bin \
         --version 1.3.0 --changelog "- novidade" [--minor] [--security] \
-        [--hub https://os.celer.tec.br] [--token TOKEN]
+        [--variant smartdisplay-y8] [--hub https://os.celer.tec.br] \
+        [--token TOKEN]
 
 Publicar so o manifest (sem binario): omita o caminho do firmware — o
 dispositivo cai no fluxo legado (mostra changelog, sem botao INSTALL).
@@ -26,7 +30,8 @@ import uuid
 from pathlib import Path
 from urllib import error, request
 
-CHANNELS = ("esp32", "smartdisplay_4848S040")
+CHANNELS = ("esp32", "smartdisplay_4848S040", "waveshare_amoled206",
+            "spotpear_zzpet", "devkit")
 
 
 def die(msg: str) -> None:
@@ -47,7 +52,15 @@ def main() -> None:
     ap.add_argument("--force", action="store_true",
                     help="permite publicar versao MENOR que a atual do canal "
                          "(o servidor bloqueia rollback por padrao)")
-    ap.add_argument("--api-version", type=int, default=2)
+    ap.add_argument("--api-version", type=int, default=None,
+                    help="nivel de API do firmware publicado (default: o "
+                         "atual do hub; o device recusa manifest abaixo do "
+                         "nivel dele)")
+    ap.add_argument("--variant", default="",
+                    help="variante de SKU do manifest (ex.: smartdisplay-y8). "
+                         "Device com reles recusa manifest sem a sua variante; "
+                         "publique imagem de variante em canal proprio para "
+                         "nao alcancar aparelho padrao")
     ap.add_argument("--hub", default=os.environ.get("CELER_HUB", "https://os.celer.tec.br"))
     ap.add_argument("--token", default=os.environ.get("CELER_HUB_TOKEN", ""))
     args = ap.parse_args()
@@ -73,13 +86,16 @@ def main() -> None:
 
     meta = {
         "version": args.version,
-        "api_version": args.api_version,
         "major_update": args.major,
         "minor_update": args.minor,
         "security_update": args.security,
         "changelog": args.changelog,
         "guide": args.guide,
     }
+    if args.api_version is not None:
+        meta["api_version"] = args.api_version
+    if args.variant:
+        meta["variant"] = args.variant
     meta_json = json.dumps(meta, ensure_ascii=False)
 
     boundary = "----celeroshub" + uuid.uuid4().hex[:12]
@@ -110,6 +126,9 @@ def main() -> None:
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": f"multipart/form-data; boundary={boundary}",
+            # mesmo UA do celerhub.py: o Python-urllib default e barrado pelo
+            # Cloudflare do hub (403 error 1010)
+            "User-Agent": "celeroshub-cli/1.0 (celeros tools)",
         })
     try:
         with request.urlopen(req, timeout=120) as resp:
@@ -121,6 +140,8 @@ def main() -> None:
 
     fw = "com firmware.bin" if out.get("firmware") else "só manifest (sem INSTALL)"
     print(f"ok: canal {out.get('channel')} v{out.get('version')} publicado ({fw})")
+    print(f"    api_version {out.get('api_version')}" +
+          (f" · variant {out.get('variant')}" if out.get("variant") else ""))
     if out.get("sha256"):
         print(f"    sha256 {out['sha256']}")
     print(f"    {out.get('url')}")
