@@ -50,7 +50,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.3.0"
+HUB_VERSION = "0.4.0"
 BASE_URL = os.environ.get("BASE_URL", "https://os.celer.tec.br").rstrip("/")
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "/data/content"))
 AUDIT_DIR = Path(os.environ.get("AUDIT_DIR", "/data/audit"))
@@ -59,6 +59,12 @@ MAX_UPLOAD = 48 * 1024 * 1024   # teto por upload (firmware ~2 MB; folga p/ zip)
 MAX_UNPACKED = 64 * 1024 * 1024  # teto total descomprimido (anti zip-bomb)
 MAX_BODY = MAX_UPLOAD + 1024 * 1024
 MAX_MAIN_JS = 48 * 1024   # download e streaming (Net.download), sem teto de 32KB
+# Teto em 2 niveis (mesma regra do celerhub.py): acima de MAX_MAIN_JS o app
+# precisa declarar "psram" em requires — sem PSRAM a RAM interna nao fecha o
+# compile (medido na CYD: 61KB roda, 82KB nao compila). Com a declaracao o
+# teto absoluto e MAX_MAIN_JS_PSRAM (placas S3 com PSRAM nao tem limite).
+MAX_MAIN_JS_PSRAM = 128 * 1024
+VALID_REQUIRES = ("psram",)
 MAX_ICON = 16 * 1024      # PNG 64x64 nao passa de poucos KB; teto folgado
 # Acima disso o app PRECISA declarar api >= 6: firmwares antigos instalavam
 # via Net.get, que trunca o corpo em 32KB (main.js corrompido na instalacao)
@@ -341,6 +347,11 @@ def catalog_categories() -> dict[str, dict]:
             entry["md5"] = str(meta["md5"])
         if meta.get("published_at"):
             entry["published_at"] = str(meta["published_at"])
+        # Requisitos de hardware (requires psram destrava o teto de 128KB no
+        # publish): a loja do device le o campo para o badge "Requer PSRAM"
+        # e o bloqueio de install em placa sem PSRAM.
+        if meta.get("requires"):
+            entry["requires"] = list(meta["requires"])
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
         cats.setdefault(slug, {"name": cat, "apps": {}})
@@ -453,6 +464,10 @@ def _validate_meta(meta: dict) -> dict:
         meta["api"] = int(meta.get("api") or 1)
     except (TypeError, ValueError):
         raise HTTPException(400, "api deve ser inteiro")
+    requires = meta.get("requires") or []
+    if not isinstance(requires, list) or any(r not in VALID_REQUIRES for r in requires):
+        raise HTTPException(400, "requires invalido "
+                                 f"(valores: {', '.join(VALID_REQUIRES)})")
     meta.setdefault("category", "Apps")
     return pkg
 
@@ -500,9 +515,14 @@ async def publish_app(request: Request,
         raise HTTPException(413, "pacote grande demais")
     meta, files = _extract_package(data)
     pkg = _validate_meta(meta)
-    if len(files["main.js"]) > MAX_MAIN_JS:
+    if len(files["main.js"]) > MAX_MAIN_JS_PSRAM:
         raise HTTPException(413, f"main.js tem {len(files['main.js'])} bytes "
-                                 f"(max {MAX_MAIN_JS})")
+                                 f"(max {MAX_MAIN_JS_PSRAM})")
+    if len(files["main.js"]) > MAX_MAIN_JS and "psram" not in (meta.get("requires") or []):
+        raise HTTPException(400, f"main.js tem {len(files['main.js'])} bytes: acima "
+                                 f"de {MAX_MAIN_JS} exige \"psram\" em requires no "
+                                 f"app.json (sem PSRAM a RAM interna nao fecha o "
+                                 f"compile)")
     if len(files["main.js"]) > STREAM_SAFE_MAIN_JS and meta["api"] < 6:
         raise HTTPException(400, f"main.js > {STREAM_SAFE_MAIN_JS} bytes exige "
                                  f"api >= 6 no app.json (firmware antigo "
