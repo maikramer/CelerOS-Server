@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>celerctl · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html" class="on"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Referência</span>
+  <h1 class="doc-title"><strong>celerctl</strong> — a chave de fenda</h1>
+  <p class="lead">Ferramenta USB do CelerOS, estilo <code>adb</code>: fala com o
+  aparelho pela serial (ou pelo bridge WiFi) e faz de tudo — shell, arquivos,
+  <b>screenshot do framebuffer</b>, injeção de toques, install de apps, logs,
+  debugger JS e até gravar firmware sem esptool. É um script Python único no repo do
+  firmware: <code>tools/celerctl.py</code>.</p>
+
+  <div class="meta-row">
+    <span class="pill dim">pip install pyserial</span>
+    <span class="pill dim">Pillow p/ screencap</span>
+    <span class="pill get">USB · WiFi bridge</span>
+  </div>
+
+  <article>
+    <h2 id="conectar">Conectar <a class="hash" href="#conectar">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>CTL="python3 tools/celerctl.py"     # no repo CelerOS
+
+$CTL devices                        # lista USB + bridges WiFi vistos
+$CTL -p /dev/ttyUSB1 info           # versão, board, api, heap, discos
+$CTL -p 192.168.0.220:5555 info     # mesma coisa, pela rede (após pair)</pre></div>
+    <p>O <code>-p</code> aceita porta serial, prefixo do serial USB da placa ou IP do
+    bridge. O protocolo negocia sozinho (proto 2 = CRC32 + janela; <code>--proto 1</code>
+    força o caminho legado).</p>
+
+    <h2 id="comandos">Comandos <a class="hash" href="#comandos">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+      <tbody>
+        <tr><td><code>devices</code></td><td>lista placas conectadas (USB e WiFi) com versão/board/api</td></tr>
+        <tr><td><code>pair</code> · <code>provision</code></td><td>pareia o bridge WiFi (1×) · salva WiFi + token + permissões de app</td></tr>
+        <tr><td><code>info</code> · <code>top</code> · <code>stats</code></td><td>estado do sistema · CPU% por task em tempo real · foto de profiling</td></tr>
+        <tr><td><code>shell</code></td><td>shell interativo ou <code>shell "comando"</code> (ls, cat, df, ps, run, reboot…)</td></tr>
+        <tr><td><code>ls</code> · <code>cat</code> · <code>push</code> · <code>pull</code> · <code>rm</code> · <code>mkdir</code> · <code>mv</code></td><td>sistema de arquivos completo (com <code>-b 921600</code> voa)</td></tr>
+        <tr><td><code>apps list/install/pull/rm</code></td><td>gerencia apps instalados — <code>install</code> aceita <code>--sd</code>, <code>--run</code>, <code>--pula-lint</code></td></tr>
+        <tr><td><code>screencap</code> · <code>tap</code> · <code>swipe</code></td><td>captura a tela em PNG · injeta toque/arrasto — automação de UI</td></tr>
+        <tr><td><code>logcat</code> · <code>coredump</code></td><td>logs do dispositivo em tempo real · baixa o ELF do último crash</td></tr>
+        <tr><td><code>ota push</code></td><td>grava firmware pela conexão — sem esptool, sem botão</td></tr>
+        <tr><td><code>dev</code> · <code>debug</code></td><td>loop watch+reload+logs · debugger Duktape (breakpoints, step, eval)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="screencap">Screenshots e automação <a class="hash" href="#screencap">#</a></h2>
+    <p>O <code>screencap</code> baixa o framebuffer real (RGB565) e converte para PNG —
+    <b>todos os screenshots desta wiki</b> vieram daí. Com <code>tap</code>/<code>swipe</code>
+    você navega a UI remotamente:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — reproduzindo a captura do Snake</div><pre>$CTL -p /dev/ttyUSB1 screencap tela.png      # tela.png: 320x240
+
+# abre o app (pelo nome do ícone ou pelo shell)…
+$CTL -p /dev/ttyUSB1 shell "run Snake"
+
+# …joga: swipe circular cima→esq→baixo→dir com captura a cada jogada
+for mv in "120 200 120 80" "200 120 80 120" "120 80 120 200" "80 120 200 120"; do
+    $CTL -p /dev/ttyUSB1 swipe $mv
+    sleep 0.7
+    $CTL -p /dev/ttyUSB1 screencap frame.png
+done</pre></div>
+    <div class="note tip">
+      <span class="n-ico">✓</span>
+      <p><b>Truques da casa:</b> <code>tap</code> segura ~150 ms — dê um
+      <code>sleep</code> curto antes do <code>screencap</code> para a animação assentar;
+      o GIF do Snake nesta wiki é literalmente 8 desses frames com Pillow
+      (<code>quantize + save_all</code>).</p>
+    </div>
+
+    <h2 id="apps">Apps por USB <a class="hash" href="#apps">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>$CTL -p /dev/ttyUSB1 apps list
+sistema  App Store        v2.6.0      api 22  celeros.appstore
+sistema  Settings         v1.8.0      api 22  celeros.settings
+local    Snake            v1.3.0      api 22  celeros.snake
+…
+
+# instala pasta local (lint incluso) e já abre
+$CTL -p /dev/ttyUSB1 apps install minha-pasta --run
+
+# no cartão de memória, quando a placa tem
+$CTL -p /dev/ttyUSB1 apps install minha-pasta --sd
+
+# traz um app instalado de volta pro PC
+$CTL -p /dev/ttyUSB1 apps pull celeros.snake ./snake</pre></div>
+
+    <h2 id="logs-debug">Logs e debugger <a class="hash" href="#logs-debug">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># stream de logs (Ctrl-C sai; --dump copia o buffer e sai)
+$CTL -p /dev/ttyUSB1 logcat
+$CTL -p /dev/ttyUSB1 logcat --dump | grep -i sd
+
+# crash? o coredump vira ELF p/ addr2line/gdb
+$CTL -p /dev/ttyUSB1 coredump
+
+# debugger do JS: breakpoints em linha, eval no escopo do app
+$CTL -p /dev/ttyUSB1 debug "App Store"</pre></div>
+
+    <h2 id="ota-usb">Firmware pela serial <a class="hash" href="#ota-usb">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># grava no slot inativo pela própria conexão e reinicia
+$CTL -p /dev/ttyACM2 --win 2 ota push build-watch/CelerOS.bin
+ota CelerOS.bin -> app0: [########################] 1612208/1612208 bytes
+OTA ok: 1612208 bytes em 'app0'
+reiniciando para o novo firmware…</pre></div>
+    <div class="note warn">
+      <span class="n-ico">!</span>
+      <p>Uma sessão celerctl por porta por vez (serial é exclusiva). Se um comando
+      "travar", confira se não há outro <code>logcat</code>/<code>dev</code> segurando a
+      porta — o erro clássico é <code>nao responde ao protocolo HostLink</code>.</p>
+    </div>
+  </article>
+
+  <nav class="pager">
+    <a href="api-hub.html"><span class="dir">← anterior</span><span class="t">API do hub</span></a>
+    <a class="next" href="seguranca.html"><span class="dir">próximo →</span><span class="t">Segurança</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="comecando.html">primeiros passos</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

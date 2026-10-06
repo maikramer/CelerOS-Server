@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTA &amp; firmware · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html" class="on"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Construa</span>
+  <h1 class="doc-title">OTA &amp; <strong>firmware</strong></h1>
+  <p class="lead">Cada placa tem seu canal no hub (<code>/updates/&lt;canal&gt;</code>) com um
+  <code>update.json</code> e o binário. O aparelho compara versões, grava no slot
+  inativo e só troca de boot depois de validar — nunca se bricks em campo.</p>
+
+  <div class="meta-row">
+    <span class="pill get">GET /updates/*</span>
+    <span class="pill post">publish: POST /admin/updates/&lt;canal&gt;</span>
+    <span class="pill warn">anti-rollback 409</span>
+  </div>
+
+  <article>
+    <h2 id="ab">Slots A/B — como o aparelho atualiza <a class="hash" href="#ab">#</a></h2>
+    <figure class="diagram rv">
+      <svg viewBox="0 0 720 260" width="720" height="260" role="img" aria-label="Atualização OTA em slots A e B">
+        <defs>
+          <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3edbf0"/>
+          </marker>
+        </defs>
+        <text x="120" y="30" text-anchor="middle" fill="#93a3c8" font-size="12">antes (rodando no slot ota_0)</text>
+        <rect x="30" y="45" width="180" height="52" rx="12" fill="#121c36" stroke="#2b4be0"/>
+        <text x="120" y="67" text-anchor="middle" fill="#e8edf8" font-size="12.5">ota_0 · 1.7.0</text>
+        <text x="120" y="85" text-anchor="middle" fill="#4ade80" font-size="11">★ boot ativo</text>
+        <rect x="240" y="45" width="180" height="52" rx="12" fill="#121c36" stroke="#24325e"/>
+        <text x="330" y="67" text-anchor="middle" fill="#e8edf8" font-size="12.5">ota_1 · vazio</text>
+        <text x="330" y="85" text-anchor="middle" fill="#93a3c8" font-size="11">slot inativo</text>
+
+        <path class="flow" d="M430 71 C 500 71, 500 118, 545 118" stroke="#3edbf0" stroke-width="1.8" fill="none" marker-end="url(#arr3)" transform="translate(-210,60)"/>
+        <text x="360" y="128" text-anchor="middle" fill="#3edbf0" font-size="11.5">DOWNLOAD → grava no inativo → valida → troca o boot</text>
+
+        <text x="120" y="165" text-anchor="middle" fill="#93a3c8" font-size="12">depois (validado, reinicia no slot novo)</text>
+        <rect x="30" y="180" width="180" height="52" rx="12" fill="#121c36" stroke="#24325e"/>
+        <text x="120" y="202" text-anchor="middle" fill="#e8edf8" font-size="12.5">ota_0 · 1.7.0</text>
+        <text x="120" y="220" text-anchor="middle" fill="#93a3c8" font-size="11">fallback (rollback)</text>
+        <rect x="240" y="180" width="180" height="52" rx="12" fill="#121c36" stroke="#2b4be0" class="pulse"/>
+        <text x="330" y="202" text-anchor="middle" fill="#e8edf8" font-size="12.5">ota_1 · 1.8.0</text>
+        <text x="330" y="220" text-anchor="middle" fill="#4ade80" font-size="11">★ boot ativo confirmado</text>
+
+        <rect x="470" y="45" width="220" height="187" rx="12" fill="#0b1220" stroke="#24325e"/>
+        <text x="580" y="72" text-anchor="middle" fill="#93a3c8" font-size="11">WiFi e configuracoes</text>
+        <text x="580" y="92" text-anchor="middle" fill="#4ade80" font-size="11">não se perdem ✓</text>
+        <text x="580" y="120" text-anchor="middle" fill="#93a3c8" font-size="11">apps em /local e /sd</text>
+        <text x="580" y="140" text-anchor="middle" fill="#4ade80" font-size="11">intactos ✓</text>
+        <text x="580" y="168" text-anchor="middle" fill="#93a3c8" font-size="11">se o slot novo não validar</text>
+        <text x="580" y="188" text-anchor="middle" fill="#ffce6b" font-size="11">boot volta pro anterior</text>
+      </svg>
+      <figcaption>Gravação sempre no slot inativo; a troca só acontece com o novo firmware validado.</figcaption>
+    </figure>
+
+    <h2 id="manifest">update.json, campo a campo <a class="hash" href="#manifest">#</a></h2>
+    <p>O manifest real do canal <code>esp32</code> hoje:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>content/updates/esp32/update.json</div><pre>{
+  "version": "1.1.0",
+  "api_version": 22,
+  "major_update": false,
+  "minor_update": false,
+  "security_update": false,
+  "changelog": "CelerOS Hub no ar (os.celer.tec.br). Canal de updates migrado…",
+  "guide": "Abra Settings &gt; Atualizacao e toque em INSTALL.",
+  "firmware_url": "firmware.bin",
+  "firmware_sha256": "…"
+}</pre></div>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Campo</th><th>Regra no hub</th></tr></thead>
+      <tbody>
+        <tr><td><code>version</code></td><td>semver; o device instala só se &gt; que a gravada nele</td></tr>
+        <tr><td><code>api_version</code></td><td>int 1..999, default = nível vigente do hub (<code>FIRMWARE_API_LEVEL</code>). O <b>aparelho recusa</b> manifest abaixo do próprio nível — o hub valida no publish</td></tr>
+        <tr><td><code>major/minor/security_update</code></td><td>flags de UI (badges na tela de OTA)</td></tr>
+        <tr><td><code>changelog</code> <code>guide</code></td><td>texto; changelog aparece na tela de atualização</td></tr>
+        <tr><td><code>variant</code></td><td>SKU opcional (ex.: <code>smartdisplay-y8</code> para a SmartDisplay com relés). Device com variante recusa manifest sem a própria — publique imagem de variante em canal próprio</td></tr>
+        <tr><td><code>firmware_url</code></td><td>relativa ao diretório do manifest (normalmente <code>firmware.bin</code>); sem binário, o publish remove o campo <b>e</b> o arquivo do canal (manifest-only)</td></tr>
+        <tr><td><code>firmware_sha256</code></td><td>computado no publish a partir do binário enviado</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="publicar-fw">Publicar firmware <a class="hash" href="#publicar-fw">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># canal da placa: esp32 | smartdisplay_4848S040 | waveshare_amoled206 | spotpear_zzpet | devkit
+python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
+  --version 1.8.0 --changelog "- SD no CYD; correcoes da loja" \
+  --hub https://os.celer.tec.br --token $CELER_HUB_TOKEN_CI
+
+# variante SmartDisplay Y (relés) — canal próprio + --variant
+python3 tools/publish_firmware.py smartdisplay_4848S040 build-y/CelerOS.bin \
+  --version 1.8.0 --variant smartdisplay-y8 --token $CELER_HUB_TOKEN_CI</pre></div>
+    <ul>
+      <li><b>Anti-rollback:</b> publicar versão menor que a atual do canal →
+      <code>409</code>. Exceção consciente: <code>--force</code>.</li>
+      <li><b>Manifest-only:</b> sem binário, o canal anuncia a versão sem firmware
+      (útil para notas/migração de hub) e o <code>firmware.bin</code> antigo é
+      removido.</li>
+      <li><b>Atomicidade:</b> o binário grava como <code>firmware.bin.tmp</code> e
+      vira <code>firmware.bin</code> por rename — cliente nunca lê meio arquivo.</li>
+    </ul>
+
+    <h3>No CI (GitHub Actions)</h3>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>.github/workflows/ota.yml</div><pre>- name: Publicar OTA
+  run: |
+    python3 CelerOS-Server/tools/publish_firmware.py esp32 \
+      build-cyd/CelerOS.bin --version ${{ steps.ver.outputs.v }} \
+      --changelog "${{ github.event.head_commit.message }}" \
+      --hub https://os.celer.tec.br --token ${{ secrets.CELER_HUB_TOKEN }}</pre></div>
+    <p>O token do CI precisa só do escopo <code>updates</code>.</p>
+
+    <h2 id="sem-esptool">OTA por USB, sem esptool <a class="hash" href="#sem-esptool">#</a></h2>
+    <p>Para gravar direto do PC pela conexão do celerctl (o caminho do relógio, sem
+    botões expostos):</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>python3 tools/celerctl.py -p /dev/ttyACM2 --win 2 ota push build-watch/CelerOS.bin
+# ota CelerOS.bin -> app0: [####…] 1612208/1612208 bytes
+# reiniciando para o novo firmware…</pre></div>
+    <div class="note warn">
+      <span class="n-ico">!</span>
+      <p>Gravando firmware <b>mais novo que o canal</b>? Atualize o canal em seguida —
+      o aparelho compara com o manifest do hub e "sistema atualizado" para tudo que
+      não for versão maior.</p>
+    </div>
+
+    <h2 id="estados">Canais hoje <a class="hash" href="#estados">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Canal</th><th>Placa</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td><code>esp32</code></td><td>CYD</td><td>manifest 1.1.0 publicado</td></tr>
+        <tr><td><code>smartdisplay_4848S040</code></td><td>SmartDisplay 4"</td><td>manifest 1.1.0 publicado</td></tr>
+        <tr><td><code>waveshare_amoled206</code></td><td>relógio</td><td>criação por publish</td></tr>
+        <tr><td><code>spotpear_zzpet</code></td><td>cachorro</td><td>criação por publish</td></tr>
+        <tr><td><code>devkit</code></td><td>devkit</td><td>criação por publish</td></tr>
+      </tbody>
+    </table></div>
+    <p><button class="try" data-ep="/updates/esp32/update.json">▶ testar manifest</button>
+       <button class="try" data-ep="/api/info">▶ ver todos em /api/info</button></p>
+  </article>
+
+  <nav class="pager">
+    <a href="desenvolver-apps.html"><span class="dir">← anterior</span><span class="t">Desenvolver apps</span></a>
+    <a class="next" href="api-hub.html"><span class="dir">próximo →</span><span class="t">API do hub</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="api-hub.html">API</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

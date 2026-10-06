@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Placas suportadas · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html" class="on"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page wide">
+  <span class="kicker">Use o CelerOS</span>
+  <h1 class="doc-title">Placas <strong>suportadas</strong></h1>
+  <p class="lead">Cinco placas, cinco canais OTA no hub. Os apps em JS escrevem contra um
+  canvas lógico de 240×320 que o firmware escala para o vidro de cada placa — o mesmo
+  <code>main.js</code> roda no monitor de 2,8" e no relógio redondo. As telas abaixo são
+  capturas reais do framebuffer de cada placa, feitas com <code>celerctl screencap</code>.</p>
+
+  <article>
+    <!-- CYD -->
+    <h2 id="cyd">CYD · ESP32-2432S028R <a class="hash" href="#cyd">#</a></h2>
+    <div class="shot-grid rv">
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-launcher.png" alt="Launcher na CYD"></div>
+        <figcaption><b>Launcher</b> · página 1 com WiFi e relógio NTP</figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-gaveta.png" alt="Gaveta de apps na CYD"></div>
+        <figcaption><b>Gaveta</b> · todos os apps instalados</figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-snake.png" alt="Snake na CYD"></div>
+        <figcaption><b>Snake</b> · app JS da loja</figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-2048.png" alt="2048 na CYD"></div>
+        <figcaption><b>2048</b> · com Desfazer e recorde</figcaption></figure>
+    </div>
+    <ul>
+      <li><b>Chip:</b> ESP32 clássico, 4 MB flash, <b>sem PSRAM</b> — o firmware roda
+      unicore e usa a IRAM como heap extra para caber TLS + Duktape.</li>
+      <li><b>Tela:</b> ILI9341 320×240 <i>landscape</i>, touch <b>resistivo</b> XPT2046
+      com calibração interativa de 5 pontos (persistida em <code>/local/touch_cal_p.bin</code>).</li>
+      <li><b>Extras:</b> LED RGB, LDR (brilho automático), alto-falante, e
+      <b>microSD compartilhando o HSPI com o TFT</b> — o cartão monta como segundo
+      dispositivo do barramento (multi-device do driver SPI do IDF) e vira o
+      <code>/sd</code> com giagas para apps.</li>
+      <li><b>Canal OTA:</b> <code>esp32</code></li>
+    </ul>
+
+    <!-- SmartDisplay -->
+    <h2 id="smartdisplay">SmartDisplay · 4848S040 <a class="hash" href="#smartdisplay">#</a></h2>
+    <div class="shot-grid rv">
+      <figure class="shot"><div class="frame"><img src="img/sd-launcher.png" alt="Launcher na SmartDisplay"></div>
+        <figcaption><b>Launcher</b> · grid 480×480</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/sd-store-todos.png" alt="Loja na SmartDisplay"></div>
+        <figcaption><b>App Store</b> · categoria Todos</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/sd-ota.png" alt="Tela OTA na SmartDisplay"></div>
+        <figcaption><b>OTA</b> · Settings → Atualizacao</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/sd-settings.png" alt="Settings na SmartDisplay"></div>
+        <figcaption><b>Settings</b></figcaption></figure>
+    </div>
+    <ul>
+      <li><b>Chip:</b> ESP32-S3 com <b>8 MB de PSRAM</b> — é aqui que apps grandes
+      (acima de 48 KB) e o bundle completo de CAs do TLS vivem à vontade.</li>
+      <li><b>Tela:</b> IPS 480×480, touch <b>capacitivo</b> (sem calibração), áudio
+      I2S via NS4168.</li>
+      <li><b>Extras:</b> slot microSD dedicado (FAT em <code>/sd</code>) e a variante
+      <b>SmartDisplay Y</b> com relés — firmware próprio e <code>variant</code> de SKU
+      no manifest OTA (ex.: <code>smartdisplay-y8</code>).</li>
+      <li><b>Canal OTA:</b> <code>smartdisplay_4848S040</code></li>
+    </ul>
+
+    <!-- Watch -->
+    <h2 id="watch">Waveshare · AMOLED 2.06 (relógio) <a class="hash" href="#watch">#</a></h2>
+    <div class="shot-grid tight rv">
+      <figure class="shot round"><div class="frame"><img src="img/watch-watchface.png" alt="Watchface no relógio"></div>
+        <figcaption><b>Watchface</b> digital</figcaption></figure>
+      <figure class="shot round"><div class="frame"><img src="img/watch-launcher.png" alt="Launcher do relógio"></div>
+        <figcaption><b>Launcher</b> circular</figcaption></figure>
+    </div>
+    <ul>
+      <li><b>Chip:</b> ESP32-S3, display <b>AMOLED redondo 412×502</b> em QSPI, touch
+      capacitivo GT911.</li>
+      <li><b>Perfil:</b> relógio de verdade — watchfaces como plugins, notificações do
+      Phone Link (Gadgetbridge) e <i>inset</i> circular: o canvas lógico 240×320 é
+      mapeado no vidro redondo com máscara.</li>
+      <li><b>Canal OTA:</b> <code>waveshare_amoled206</code></li>
+    </ul>
+
+    <!-- Dog -->
+    <h2 id="dog">Spotpear · ZZ-PET (cachorro robô) <a class="hash" href="#dog">#</a></h2>
+    <div class="shot-grid tight rv">
+      <figure class="shot"><div class="frame"><img src="img/dog-main.png" alt="Tela principal do cachorro robô"></div>
+        <figcaption><b>Status</b> · HI CELER</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/dog-voice.png" alt="Tela de voz do cachorro"></div>
+        <figcaption><b>Voz</b> · wake word ativa</figcaption></figure>
+    </div>
+    <ul>
+      <li><b>Chip:</b> ESP32-S3, OLED 128×64, servos de marcha, microfone e IMU.</li>
+      <li><b>Perfil:</b> o cachorro de estimação — tela de status (bateria, modo),
+      <b>voz com wake word "Hi Celer"</b> e IA on-device; é a placa do
+      <i>dog bench</i> em <code>tools/dog/</code>.</li>
+      <li><b>Canal OTA:</b> <code>spotpear_zzpet</code></li>
+    </ul>
+
+    <!-- Devkit -->
+    <h2 id="devkit">Devkit · barebone <a class="hash" href="#devkit">#</a></h2>
+    <ul>
+      <li><b>Qualquer ESP32 devkit</b> sem tela — o perfil para desenvolver o sistema:
+      logs no serial, <code>celerctl</code> completo e apps JS rodam "cegos"
+      (o framebuffer existe mesmo sem vidro, e o <code>screencap</code> funciona).</li>
+      <li><b>Canal OTA:</b> <code>devkit</code></li>
+    </ul>
+
+    <h2 id="comparativo">Comparativo <a class="hash" href="#comparativo">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Placa</th><th>Canal OTA</th><th>Chip</th><th>Vidro</th><th>Touch</th><th>PSRAM</th><th>SD</th></tr></thead>
+      <tbody>
+        <tr><td>CYD 2432S028R</td><td><code>esp32</code></td><td>ESP32</td><td>320×240 ILI9341</td><td>resistivo</td><td class="pill warn">não</td><td>compartilhado ✓</td></tr>
+        <tr><td>SmartDisplay 4848S040</td><td><code>smartdisplay_4848S040</code></td><td>ESP32-S3</td><td>480×480 IPS</td><td>capacitivo</td><td class="pill ok">8 MB</td><td>dedicado ✓</td></tr>
+        <tr><td>Waveshare AMOLED 2.06</td><td><code>waveshare_amoled206</code></td><td>ESP32-S3</td><td>412×502 AMOLED ⬤</td><td>capacitivo</td><td class="pill ok">sim</td><td>—</td></tr>
+        <tr><td>Spotpear ZZ-PET</td><td><code>spotpear_zzpet</code></td><td>ESP32-S3</td><td>128×64 OLED</td><td>—</td><td class="pill ok">sim</td><td>—</td></tr>
+        <tr><td>Devkit</td><td><code>devkit</code></td><td>ESP32</td><td>—</td><td>—</td><td>conforme placa</td><td>—</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="note tip">
+      <span class="n-ico">✓</span>
+      <p><b>Uma tela, um firmware.</b> A coluna "vidro" é a resolução física; os apps
+      sempre desenham em 240×320 lógico e o <code>Layout</code> do firmware faz o
+      mapeamento (escala, rotação e inset) por placa.</p>
+    </div>
+  </article>
+
+  <nav class="pager">
+    <a href="visao-geral.html"><span class="dir">← anterior</span><span class="t">O ecossistema</span></a>
+    <a class="next" href="comecando.html"><span class="dir">próximo →</span><span class="t">Primeiros passos</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="ota.html">canais OTA</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

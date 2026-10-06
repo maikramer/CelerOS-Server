@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploy &amp; ops · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html" class="on"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Operação</span>
+  <h1 class="doc-title">Deploy &amp; <strong>ops</strong></h1>
+  <p class="lead">O repo é a aplicação: a stack vive em <code>stacks/.celeros-hub/</code>
+  (stack <b>externa</b> do denv) e o conteúdo em <code>content/</code> sincroniza por
+  rsync para o NFS. Duas alavancas: <b>sync</b> (conteúdo, sem restart) e
+  <b>build/update</b> (código da API, por tag de versão).</p>
+
+  <div class="meta-row">
+    <span class="pill dim">denv · Swarm</span>
+    <span class="pill dim">Traefik websecure</span>
+    <span class="pill dim">NFS rw</span>
+  </div>
+
+  <article>
+    <h2 id="anatomia">Anatomia da stack <a class="hash" href="#anatomia">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Arquivo</th><th>Papel</th></tr></thead>
+      <tbody>
+        <tr><td><code>service.yml</code></td><td>metadados da stack denv, healthcheck <code>/health</code>, monitoring
+        (<code>/health</code> + <code>/api/info</code>), registry <code>maikramer/celeros-hub</code> e a definição do
+        <b>sync</b> (rsync <code>content/</code> → NFS, <code>required_dirs</code> content+audit)</td></tr>
+        <tr><td><code>docker-compose.yml</code></td><td>serviço único: imagem por <code>BASE_TAG</code>, secrets montados,
+        volumes NFS rw (content + audit), healthcheck wget, placement no nó <code>dockergpu</code>,
+        Traefik <code>Host(os.celer.tec.br)</code> na rede pública, limites 0.5 CPU / 256 MB</td></tr>
+        <tr><td><code>dockerfile.celeros-hub</code></td><td>python:3.12-alpine + fastapi/uvicorn/python-multipart pinados;
+        <b>um único arquivo</b> <code>api/app.py</code> copiado — a API inteira</td></tr>
+        <tr><td><code>api/app.py</code></td><td>o hub (~850 linhas): rotas, auth, catálogo na rota, admin, mounts</td></tr>
+        <tr><td><code>env/</code> <span class="pill dim">gitignored</span></td><td>root-token.txt, tokens.json e env.sh — fonte
+        local dos Docker secrets</td></tr>
+      </tbody>
+    </table></div>
+    <p>Registro único na máquina de dev: <code>denv external add ~/GitClones/CelerOS-Server</code>.</p>
+
+    <h2 id="conteudo">Mudou conteúdo? Sync. <a class="hash" href="#conteudo">#</a></h2>
+    <p>Wiki, portal, help, apps publicados por API admin — tudo isso vive no NFS como
+    arquivos. O fluxo do repo para o servidor é um rsync:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># conteúdo novo no repo (ex.: esta wiki) → servidor:
+denv sync celeros-hub          # rsync content/ → /mnt/nfs/celeros-hub/content
+
+# sem restart, sem rebuild: o hub lê do disco a cada request</pre></div>
+    <div class="note tip">
+      <span class="n-ico">✓</span>
+      <p>O sentido inverso acontece sozinho na publicação por API: o admin grava no
+      NFS (volume rw). O rsync do sync não deleta o que só existe lá (apps
+      publicados em runtime sobrevivem).</p>
+    </div>
+
+    <h2 id="codigo">Mudou a API? Build + update por tag <a class="hash" href="#codigo">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># 1) suba HUB_VERSION em api/app.py (ex.: 0.7.0) — a TAG é a versão do serviço
+#    (git-guard: commit + push antes de deployar)
+
+# 2) build + push da imagem com a tag nova
+denv build --service celeros-hub --tag 0.7.0 --push
+
+# 3) rolling update
+denv update celeros-hub -t 0.7.0</pre></div>
+    <p>Tag inexistente no registry força build de verdade — o motivo da convenção
+    "tag = versão": tag reescrita deixava o update pular o build e rodar código
+    velho.</p>
+
+    <h2 id="secrets">Secrets <a class="hash" href="#secrets">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — a partir da pasta env/ local</div><pre>docker secret create celeros_hub_admin_token env/root-token.txt
+docker secret create celeros_hub_tokens       env/tokens.json
+# (secret já existe? docker secret rm antes — são imutáveis)</pre></div>
+    <p>O compose mapeia para <code>HUB_ADMIN_TOKEN_FILE</code> /
+    <code>HUB_TOKENS_FILE</code>; o hub relê os tokens a cada request (detalhes em
+    <a href="seguranca.html#tokens">segurança</a>).</p>
+
+    <h2 id="dns">DNS &amp; TLS (uma vez) <a class="hash" href="#dns">#</a></h2>
+    <ul>
+      <li>Zona <code>celer.tec.br</code> no Cloudflare: <code>os</code> → IP público do
+      Traefik (187.95.46.25), <i>proxied</i> funciona com o Origin Cert existente.</li>
+      <li>Sem proxy: entre com certresolver próprio ou Origin Cert do host.</li>
+      <li>O Traefik publica <code>websecure</code>; o container do hub não tem porta no
+      host.</li>
+    </ul>
+
+    <h2 id="local">Rodar local (dev) <a class="hash" href="#local">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>pip install fastapi==0.115.12 "uvicorn[standard]==0.34.2" python-multipart==0.0.20
+
+BASE_URL=http://127.0.0.1:8901 CONTENT_DIR=$PWD/content \
+HUB_ADMIN_TOKEN=devtoken HUB_DOCS=1 \
+  python3 -m uvicorn --app-dir stacks/.celeros-hub/api app:app --port 8901
+
+# Swagger em http://127.0.0.1:8901/api/docs (HUB_DOCS=1)</pre></div>
+    <p>Nota: help e OTA usam URLs absolutas de produção nos arquivos de conteúdo —
+    para testar local, mapeie <code>os.celer.tec.br</code> para <code>127.0.0.1</code>
+    no <code>/etc/hosts</code> ou aponte o <code>BASE_URL</code> de teste.</p>
+
+    <h2 id="testes">Testes <a class="hash" href="#testes">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — 67 checks offline</div><pre>python3 tools/test_api.py
+# … apps, multi-arquivo, limites, downloads, OTA (api_version/variant/anti-rollback)</pre></div>
+    <p>Roda contra um <code>TestClient</code> com diretórios temporários — sem rede,
+    sem secrets: válido para qualquer ambiente. É a mesma bateria que valida uma
+    mudança de <code>app.py</code> antes do deploy.</p>
+
+    <h2 id="monitoramento">No ar, como conferir <a class="hash" href="#monitoramento">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>curl -s os.celer.tec.br/health          # {"status":"ok","version":"…"}
+curl -s os.celer.tec.br/api/info | jq '{uptime:.uptime_s, apps:.store.apps, dl:.downloads_total}'
+
+# no cluster:
+docker service ls | grep celeros-hub     # REPLICAS 1/1
+docker service logs celeros-hub --tail 50</pre></div>
+    <p>O healthcheck do Swarm bate <code>/health</code> a cada 30 s (wget interno,
+    start period 30 s); o painel do denv consome <code>/health</code> +
+    <code>/api/info</code> como JSON.</p>
+
+    <h2 id="troubleshooting">Troubleshooting rápido <a class="hash" href="#troubleshooting">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Sintoma</th><th>Onde olhar</th></tr></thead>
+      <tbody>
+        <tr><td>portal 404 / wiki não aparece</td><td>rodou o <code>denv sync</code>? arquivo está em <code>content/www/…</code>?</td></tr>
+        <tr><td><code>/admin</code> devolve 503</td><td>nenhum secret de token montado — esperado até configurar</td></tr>
+        <tr><td>429 sem motivo aparente</td><td>IP bloqueado por falhas de auth (15 min) — audit.log conta a história</td></tr>
+        <tr><td>app publicado sumiu após sync</td><td>não some: sync não deleta runtime; confira o scan (pacote sem app.json+main.js é pulado)</td></tr>
+        <tr><td>update rodou código velho</td><td>tag repetida no registry — suba HUB_VERSION e faça build com tag nova</td></tr>
+        <tr><td>downloads zeraram após redeploy</td><td>contador vive em <code>/data/stats</code> na camada do container — conhecido, sem volume ainda</td></tr>
+      </tbody>
+    </table></div>
+  </article>
+
+  <nav class="pager">
+    <a href="seguranca.html"><span class="dir">← anterior</span><span class="t">Segurança</span></a>
+    <a class="next" href="index.html"><span class="dir">↺ recomeçar</span><span class="t">Visão da wiki</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="seguranca.html">segurança</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

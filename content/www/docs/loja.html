@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Store &amp; loja · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html" class="on"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page wide">
+  <span class="kicker">Use o CelerOS</span>
+  <h1 class="doc-title">App Store &amp; <strong>loja</strong></h1>
+  <p class="lead">A loja que o dispositivo lê é um diretório de arquivos no hub:
+  cada app é uma pasta com <code>app.json</code> + <code>main.js</code> e o catálogo
+  é gerado na rota a cada request. O cliente é a própria App Store do aparelho —
+  um app de sistema em JS que se auto-atualiza pelo mesmo mecanismo.</p>
+
+  <div class="meta-row">
+    <span class="pill get">GET /store/*</span>
+    <span class="pill post">publish: POST /admin/apps</span>
+    <span class="pill dim">catálogo gerado na rota</span>
+  </div>
+
+  <article>
+    <h2 id="telas">A App Store no aparelho <a class="hash" href="#telas">#</a></h2>
+    <div class="shot-grid rv">
+      <figure class="shot"><div class="frame"><img src="img/sd-store-cats.png" alt="Categorias da loja"></div>
+        <figcaption><b>Categorias</b> · Loja → categoria</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/sd-store-todos.png" alt="Lista de apps"></div>
+        <figcaption><b>Todos</b> · cards com INSTALAR</figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-store-detail.png" alt="Detalhe do app"></div>
+        <figcaption><b>Detalhe</b> · changelog + INSTALAR</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/sd-store-inst.png" alt="Apps instalados"></div>
+        <figcaption><b>Instalados</b> · atualizações com checksum</figcaption></figure>
+    </div>
+    <div class="note info">
+      <span class="n-ico">i</span>
+      <p>As três abas — <b>Loja</b>, <b>Atualizar</b> e <b>Instalados</b> — vivem no
+      mesmo app; a aba Atualizar compara versão e MD5 do <code>main.js</code> instalado
+      com o do catálogo e só mexe no que mudou.</p>
+    </div>
+
+    <h2 id="instalacao">Como uma instalação acontece <a class="hash" href="#instalacao">#</a></h2>
+    <figure class="diagram rv">
+      <svg viewBox="0 0 720 190" width="720" height="190" role="img" aria-label="Fluxo de instalação de um app">
+        <defs>
+          <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3edbf0"/>
+          </marker>
+        </defs>
+        <g>
+          <rect x="20" y="55" width="130" height="52" rx="12" fill="#121c36" stroke="#24325e"/>
+          <text x="85" y="85" text-anchor="middle" fill="#e8edf8" font-size="12.5">catálogo</text>
+          <rect x="200" y="55" width="150" height="52" rx="12" fill="#121c36" stroke="#24325e"/>
+          <text x="275" y="79" text-anchor="middle" fill="#e8edf8" font-size="12.5">Net.download</text>
+          <text x="275" y="96" text-anchor="middle" fill="#93a3c8" font-size="10.5">streaming p/ .new</text>
+          <rect x="400" y="55" width="150" height="52" rx="12" fill="#121c36" stroke="#24325e"/>
+          <text x="475" y="79" text-anchor="middle" fill="#e8edf8" font-size="12.5">confere MD5</text>
+          <text x="475" y="96" text-anchor="middle" fill="#93a3c8" font-size="10.5">por arquivo</text>
+          <rect x="600" y="55" width="110" height="52" rx="12" fill="#121c36" stroke="#2b4be0"/>
+          <text x="655" y="85" text-anchor="middle" fill="#e8edf8" font-size="12.5">rename ✓</text>
+          <path class="flow" d="M150 81 L 198 81" stroke="#3edbf0" stroke-width="1.8" fill="none" marker-end="url(#arr2)"/>
+          <path class="flow" d="M350 81 L 398 81" stroke="#3edbf0" stroke-width="1.8" fill="none" marker-end="url(#arr2)"/>
+          <path class="flow" d="M550 81 L 598 81" stroke="#3edbf0" stroke-width="1.8" fill="none" marker-end="url(#arr2)"/>
+          <text x="360" y="150" text-anchor="middle" fill="#93a3c8" font-size="11.5">falha em qualquer passo → o app anterior continua íntegro (nunca fica pela metade)</text>
+        </g>
+      </svg>
+      <figcaption>Instalação atômica: baixa em <code>&lt;pkg&gt;/main.js.new</code>, confere o MD5 e só então renomeia.</figcaption>
+    </figure>
+    <ul>
+      <li><b>Destino:</b> <code>/local/apps/&lt;pkg&gt;</code> no flash, ou
+      <code>/sd/apps</code> quando o flag <code>/local/config_install_sd.txt</code>
+      existe (placas com cartão).</li>
+      <li><b>Multi-arquivo:</b> pacotes com <code>files</code> no catálogo baixam cada
+      extra com MD5 próprio; o <i>rename</i> em lote só roda com 100% dos downloads ok.</li>
+      <li><b>Self-update:</b> a própria <code>celeros.appstore</code> está no catálogo
+      (entrada <code>system: true</code>) — a loja atualiza a si mesma como qualquer app.</li>
+      <li><b>API:</b> o card mostra o requisito e o hub já barra no publish o que o
+      firmware da placa não rodaria (ex.: <code>main.js</code> &gt; 30 KB exige
+      <code>api ≥ 6</code>).</li>
+    </ul>
+    <p>E quando você toca instalar, é isto rodando no aparelho (do
+    <code>main.js</code> da App Store):</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>App Store/main.js — instalação</div><pre>okDL = Net.download(fe.url, ftmp, function (got, total) {
+    bar(got, total);                       // progresso sem piscar
+});
+if (okDL && md5File(ftmp) === fe.md5) renameOK.push(ftmp, fe.dest);
+// ...no fim: 100% ok → renomeia em lote; qualquer falha → limpa .new</pre></div>
+
+    <h2 id="contrato">O contrato, campo a campo <a class="hash" href="#contrato">#</a></h2>
+    <p>Três níveis, todos JSON plano. As URLs são absolutas (montadas com o
+    <code>BASE_URL</code> do servidor) — o cliente não conhece domínio chumbado.</p>
+
+    <h3>1 · índice — <code>GET /store/index.json</code></h3>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>resposta real (resumida)</div><pre>{
+  "name": "CelerOS App Store",
+  "base": "https://os.celer.tec.br",
+  "updated": "2026-10-05T21:26:02Z",
+  "categories": {
+    "Todos":     "https://os.celer.tec.br/store/all.json",
+    "Arcade":    "https://os.celer.tec.br/store/arcade.json",
+    "Utility":   "https://os.celer.tec.br/store/utility.json",
+    "System":    "…", "Demos": "…", "Benchmark": "…", "Simulation": "…"
+  }
+}</pre></div>
+
+    <h3>2 · categoria — <code>GET /store/arcade.json</code> (ou <code>all.json</code>)</h3>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>entrada de um app no mapa <code>apps</code></div><pre>"celeros.2048": {
+  "meta": "https://os.celer.tec.br/store/apps/celeros.2048/app.json",
+  "app":  "https://os.celer.tec.br/store/apps/celeros.2048/main.js",
+  "api": 3,
+  "name": "2048", "version": "1.1.0", "author": "KryonOS",
+  "description": "Deslize as pecas, junte iguais e chegue no 2048…",
+  "category": "Arcade",
+  "changelog": "1.1.0 - botao Desfazer…",
+  "icon": "https://os.celer.tec.br/store/apps/celeros.2048/icon.png",
+  "size": 8304, "md5": "5a76e324f250bf3003dfef80edd5b05a",
+  "published_at": "2026-09-28T04:49:20Z",
+  "files": { "util.js": { "size": 1234, "md5": "…" } }   // só em pacotes multi-arquivo
+}</pre></div>
+    <p>Campos mínimos que o cliente usa: <code>meta</code>, <code>app</code>,
+    <code>api</code>. O resto alimenta o portal e as badges do card (PSRAM, tamanho,
+    downloads).</p>
+
+    <h3>3 · manifesto do pacote — <code>app.json</code> em cada pasta</h3>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Campo</th><th>Regra</th><th>Quem escreve</th></tr></thead>
+      <tbody>
+        <tr><td><code>packageName</code></td><td><code>^[a-z0-9]+(\.[a-z0-9]+)+$</code> — ex.: <code>celeros.2048</code></td><td>autor</td></tr>
+        <tr><td><code>name</code> <code>author</code> <code>description</code></td><td>obrigatórios, texto livre</td><td>autor</td></tr>
+        <tr><td><code>version</code></td><td>semver <code>x.y.z</code>; publish exige &gt; que a atual</td><td>autor</td></tr>
+        <tr><td><code>api</code></td><td>int, nível mínimo de firmware (default 1)</td><td>autor</td></tr>
+        <tr><td><code>category</code></td><td>default <code>Apps</code> — vira categoria da loja</td><td>autor</td></tr>
+        <tr><td><code>requires</code></td><td>⊂ <code>["psram"]</code> — libera main.js até 128 KB</td><td>autor</td></tr>
+        <tr><td><code>permissions</code></td><td><code>fs</code> <code>net</code> <code>gpio</code> <code>system</code> — consentimento no device</td><td>autor</td></tr>
+        <tr><td><code>changelog</code></td><td>texto; o card "novidades" mostra</td><td>autor</td></tr>
+        <tr><td><code>size</code> <code>md5</code> <code>published_at</code> <code>publisher</code> <code>files</code></td><td>recomputados no publish</td><td class="pill warn">hub — nunca setar à mão</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note warn">
+      <span class="n-ico">!</span>
+      <p>O <code>celerctl apps install</code> de pasta local <b>recusa</b>
+      <code>app.json</code> com campos gerenciados (<code>publisher</code>,
+      <code>published_at</code>…) — a cópia do hub não serve de pasta de install
+      direto; use o <a href="api-hub.html#publish">publish do hub</a> ou limpe os
+      campos.</p>
+    </div>
+
+    <h2 id="catalogo-api">As rotas do catálogo <a class="hash" href="#catalogo-api">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Retorna</th></tr></thead>
+      <tbody>
+        <tr><td><code>/store/index.json</code></td><td><span class="pill get">GET</span></td><td>índice de categorias (+ "Todos")</td></tr>
+        <tr><td><code>/store/all.json</code></td><td><span class="pill get">GET</span></td><td>união de todas as categorias — 1 request</td></tr>
+        <tr><td><code>/store/&lt;slug&gt;.json</code></td><td><span class="pill get">GET</span></td><td>apps de uma categoria (404 se inexistente)</td></tr>
+        <tr><td><code>/store/apps/&lt;pkg&gt;/main.js</code></td><td><span class="pill get">GET</span></td><td>o app — <b>conta um download</b> no <code>/api/info</code></td></tr>
+        <tr><td><code>/store/apps/&lt;pkg&gt;/…</code></td><td><span class="pill get">GET</span></td><td>app.json, icon.png e extras (estático)</td></tr>
+      </tbody>
+    </table></div>
+    <p><button class="try" data-ep="/store/index.json">▶ testar</button></p>
+  </article>
+
+  <nav class="pager">
+    <a href="comecando.html"><span class="dir">← anterior</span><span class="t">Primeiros passos</span></a>
+    <a class="next" href="desenvolver-apps.html"><span class="dir">próximo →</span><span class="t">Desenvolver apps</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="desenvolver-apps.html">publicar apps</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

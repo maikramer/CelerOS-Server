@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segurança · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html" class="on"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Operação</span>
+  <h1 class="doc-title"><strong>Segurança</strong></h1>
+  <p class="lead">O modelo é curto de propósito: <b>leitura pública, escrita
+  autenticada com escopo, tudo auditado</b>. A loja, o OTA e a ajuda não autenticam
+  porque o dispositivo não tem conta — a proteção do lado da escrita é que decide o
+  jogo.</p>
+
+  <div class="meta-row">
+    <span class="pill get">leitura pública por design</span>
+    <span class="pill post">Bearer + escopo</span>
+    <span class="pill dim">auditoria append-only</span>
+  </div>
+
+  <article>
+    <h2 id="tokens">Tokens &amp; escopos <a class="hash" href="#tokens">#</a></h2>
+    <p>Dois sabores, ambos em <b>Docker secrets</b> (nunca em environment/commit):</p>
+    <ul>
+      <li><b>Root</b> — secret <code>celeros_hub_admin_token</code>, escopo <code>*</code>
+      (retrocompatível com a era de um token único).</li>
+      <li><b>Nomeados</b> — secret <code>celeros_hub_tokens</code>, um JSON
+      <code>[{"name","token","scopes"}]</code> gerado pelo <code>tools/make_tokens.py</code>.
+      Cada token tem escopo explícito e o <b>nome aparece na auditoria</b>.</li>
+    </ul>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Escopo</th><th>Permite</th><th>Para quem</th></tr></thead>
+      <tbody>
+        <tr><td><code>*</code></td><td>tudo</td><td>você (root)</td></tr>
+        <tr><td><code>apps</code></td><td>publicar/remover apps da loja</td><td>colaboradores</td></tr>
+        <tr><td><code>updates</code></td><td>publicar/remover canais OTA</td><td>CI / publicador de firmware</td></tr>
+      </tbody>
+    </table></div>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — ciclo de vida de um token</div><pre>python3 tools/make_tokens.py > tokens.json      # gere; edite nomes/escopos
+docker secret create celeros_hub_tokens tokens.json &amp;&amp; shred -u tokens.json
+
+# conferir um token (o CI pode validar antes de publicar)
+curl -s -H "Authorization: Bearer $T" https://os.celer.tec.br/admin/whoami
+# → {"name":"ci","scopes":["updates"]}</pre></div>
+    <p><b>Rotação sem restart:</b> o hub relê o arquivo de tokens a cada request —
+    recriar o secret + <code>denv update</code> basta (secrets são imutáveis no Swarm,
+    por isso o rm+create). Comparação de token é <code>secrets.compare_digest</code>
+    (constante-time).</p>
+
+    <h2 id="rate-limit">Rate limit de autenticação <a class="hash" href="#rate-limit">#</a></h2>
+    <ul>
+      <li>10 falhas de auth em 10 min do mesmo IP → bloqueio de 15 min
+      (<code>429</code> + <code>Retry-After</code>).</li>
+      <li>O IP vem do <code>X-Forwarded-For</code> do Traefik — confiança válida porque
+      o container <b>não publica porta no host</b>: só o reverse proxy o alcança.</li>
+      <li>Sem nenhum secret configurado, o <code>/admin</code> responde <code>503</code>
+      — servidor sem credencial é servidor com admin desligado, não aberto.</li>
+    </ul>
+
+    <h2 id="auditoria">Auditoria <a class="hash" href="#auditoria">#</a></h2>
+    <p>Append-only em <code>/mnt/nfs/celeros-hub/audit/audit.log</code> — fora do
+    rsync de conteúdo de propósito (deploy não mexe no histórico). JSON-lines:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>audit.log</div><pre>{"ts":"2026-10-05T21:26:11Z","ip":"203.0.113.7","agent":"ci","action":"ota:publicar","target":"esp32","ok":true}
+{"ts":"2026-10-05T21:27:02Z","ip":"203.0.113.9","action":"auth/falha","ok":false,"err":"token invalido"}</pre></div>
+    <p>Ações registradas: <code>auth/falha</code>, <code>auth/escopo:&lt;s&gt;</code>,
+    <code>app:publicar</code>, <code>app:remover</code>, <code>ota:publicar</code>,
+    <code>ota:remover</code>. A auditoria nunca derruba a request — falha nela é
+    falha silenciosa do log, não do serviço.</p>
+
+    <h2 id="uploads">Uploads validados <a class="hash" href="#uploads">#</a></h2>
+    <p>Cada camada do publish de app existe por um motivo:</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Camada</th><th>Proteção</th></tr></thead>
+      <tbody>
+        <tr><td>Tetos de tamanho</td><td>body ≤ 49 MB, zip lido ≤ 48 MB, <b>soma descomprimida ≤ 64 MB</b> (zip-bomb)</td></tr>
+        <tr><td>Nomes de arquivo</td><td>regex <code>^[A-Za-z0-9._-]{1,64}$</code>, colisão de basename → 400 — <b>sem path traversal</b></td></tr>
+        <tr><td>Whitelist de extras</td><td>só .js .png .wav .json .bin; ≤ 16 arquivos / 128 KB cada / 256 KB total</td></tr>
+        <tr><td>Ícone</td><td>magic bytes PNG + ≤ 16 KB</td></tr>
+        <tr><td>Metadados</td><td>packageName/semver/canal validados por regex; <code>requires</code> ⊆ psram</td></tr>
+        <tr><td>Escrita</td><td>staging <code>&lt;pkg&gt;.tmp</code> + swap rmtree/rename — nunca meio pacote no ar</td></tr>
+        <tr><td>Posse</td><td>quem publicou primeiro é o dono do packageName; republicação exige versão maior</td></tr>
+      </tbody>
+    </table></div>
+    <p>No OTA: anti-rollback (versão menor → <code>409</code>, força exige
+    <code>force=1</code>), binário gravado com tmp+rename e <code>firmware_sha256</code>
+    registrado no manifest.</p>
+
+    <h2 id="superficie">Superfície &amp; transporte <a class="hash" href="#superficie">#</a></h2>
+    <ul>
+      <li><b>TLS</b> termina no Traefik (entrypoint <code>websecure</code>, cert da zona
+      <code>celer.tec.br</code>); o container só fala HTTP na rede interna.</li>
+      <li><b>Swagger desligado em produção</b> (<code>HUB_DOCS=1</code> liga em dev) —
+      <code>/api/docs</code> nem existe por padrão.</li>
+      <li><b>Headers</b> em todas as respostas: <code>nosniff</code>,
+      <code>X-Frame-Options: DENY</code>, <code>no-referrer</code>.</li>
+      <li><b>404 sempre JSON</b> — sem stack trace, sem template de erro.</li>
+      <li><b>Container enxuto</b>: python alpine, uma porta interna, zero shell de
+      sistema no app.</li>
+    </ul>
+
+    <h2 id="evolucoes">Consciente e anotado (evoluções) <a class="hash" href="#evolucoes">#</a></h2>
+    <div class="note warn">
+      <span class="n-ico">!</span>
+      <p>Duas frentes estão documentadas como próximas passos, não como defesa
+      vigente: <b>verificação do sha256 no dispositivo</b> (o campo já vai no
+      manifest; o firmware atual ainda não confere) e <b>CA pinning no
+      <code>esp_https_ota</code></b> (hoje <code>setInsecure</code> — TLS termina
+      protegendo o caminho servidor↔Traefik↔internet, com o aparelho confiendo na
+      rede). Nada disso abre escrita no hub; é integridade de ponta a ponta no
+      caminho do firmware.</p>
+    </div>
+
+    <h2 id="vazou">Vazou um token? <a class="hash" href="#vazou">#</a></h2>
+    <div class="steps rv">
+      <div class="step"><h3>Tire o token do ar</h3>
+      <p>Edite o <code>tokens.json</code> local removendo a entrada (ou regenere
+      todos — <code>make_tokens.py</code> de novo).</p></div>
+      <div class="step"><h3>Recrie o secret</h3>
+      <p><code>docker secret rm celeros_hub_tokens &amp;&amp; docker secret create …</code>
+      + <code>denv update celeros-hub -t &lt;tag&gt;</code>. O hub relê a cada request:
+      revogação é imediata no próximo deploy do secret.</p></div>
+      <div class="step"><h3>Confira a auditoria</h3>
+      <p><code>grep '"agent":"&lt;nome&gt;"' audit.log</code> — todas as ações do token
+      estão lá com IP e timestamp.</p></div>
+    </div>
+  </article>
+
+  <nav class="pager">
+    <a href="celerctl.html"><span class="dir">← anterior</span><span class="t">celerctl (USB)</span></a>
+    <a class="next" href="ops-deploy.html"><span class="dir">próximo →</span><span class="t">Deploy &amp; ops</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="ops-deploy.html">deploy</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

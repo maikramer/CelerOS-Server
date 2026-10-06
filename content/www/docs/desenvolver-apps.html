@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desenvolver apps · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html" class="on"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Construa</span>
+  <h1 class="doc-title">Desenvolver <strong>apps</strong></h1>
+  <p class="lead">Um app CelerOS é uma pasta com dois arquivos: <code>app.json</code> e
+  <code>main.js</code>. O JavaScript é <b>ES5 puro</b> rodando no Duktape, desenhando
+  num canvas lógico de <b>240×320</b> que o firmware escala para o vidro da placa.
+  Sem bundler, sem npm — um editor de texto e o <code>celerctl</code> resolvem.</p>
+
+  <div class="meta-row">
+    <span class="pill dim">ES5 / Duktape</span>
+    <span class="pill dim">canvas 240×320 lógico</span>
+    <span class="pill get">main.js ≤ 48 KB</span>
+  </div>
+
+  <article>
+    <h2 id="ola">Olá mundo de verdade <a class="hash" href="#ola">#</a></h2>
+    <p>Este é o app inteiro (o <code>celeros.ola</code> da loja, na essência) — tema
+    do sistema, texto centralizado e um tap para sair da tela "sobre":</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>main.js — app completo</div><pre>var T = System.theme();          // cores do sistema (dark/light da placa)
+var W = 240, H = 320;            // canvas LOGICO — o firmware escala
+
+System.fillScreen(T.bg);
+System.setTextColor(T.text, T.bg);
+System.setFont(2);               // fonte grande
+System.drawString("Ola, CelerOS!", (W - System.textWidth("Ola, CelerOS!", 2)) / 2, 140, 2);
+
+while (true) {
+    var t = System.getTouch();
+    if (t.touched &amp;&amp; t.y &gt; 250) break;   // tap na faixa de baixo: sai
+    System.delay(20);                       // cooperation com o sistema
+}</pre></div>
+    <p>E o <code>app.json</code> mínimo que acompanha:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>app.json</div><pre>{
+  "name": "Ola",
+  "packageName": "dev.maikeu.ola",
+  "version": "1.0.0",
+  "api": 1,
+  "author": "Maikeu",
+  "description": "Diz oi e mostra onde tocar.",
+  "category": "Demos"
+}</pre></div>
+
+    <h2 id="runtime">O runtime <a class="hash" href="#runtime">#</a></h2>
+    <ul>
+      <li><b>Duktape ES5</b>: <code>var</code>, sem arrow functions, sem
+      <code>let/const</code>, sem template literals. Polyfills existem para o
+      essencial, mas escreva ES5 de verdade.</li>
+      <li><b>Loop cooperativo</b>: seu <code>while (true)</code> precisa chamar
+      <code>System.delay(ms)</code> — é o rend para o resto do sistema (UI, rede,
+      watchdog).</li>
+      <li><b>Coordenadas lógicas 240×320</b>: identidade da UI em todas as placas;
+      <code>System.getInfo()</code> entrega o vidro real (<code>screenW</code>,
+      <code>shape</code>, <code>inset</code>) quando o app precisa se adaptar.</li>
+      <li><b>Sem acentos na UI do app</b>: a fonte do dispositivo cobre Latin-1, mas
+      os glifos acentuados não existem em todos os tamanhos — a convenção do
+      ecossistema é texto sem acento (o <code>tools/acentuar.py</code> do firmware
+      devolve acentos em literais quando a fonte cobre).</li>
+    </ul>
+
+    <h2 id="apis">APIs globais <a class="hash" href="#apis">#</a></h2>
+    <p>O que fica exposto ao JS (resumo — o SDK completo com tipos está em
+    <code>tools/sdk/celer.js</code> do repo do firmware):</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Namespace</th><th>O essencial</th></tr></thead>
+      <tbody>
+        <tr><td><code>System</code></td><td><code>fillScreen / fillRect / fillRoundRect / drawRect / drawLine</code>,
+        <code>drawString / textWidth / setTextColor</code>, <code>getTouch()</code>,
+        <code>delay()</code>, <code>theme()</code>, <code>getOSVersion() / getAPILevel()</code>,
+        <code>beep()</code>, <code>led()</code>, <code>rescanApps()</code>,
+        <code>topbarText()</code>, <code>keypad*</code> (teclado ancorado)</td></tr>
+        <tr><td><code>FS</code></td><td><code>readTextFile / writeTextFile / appendTextFile</code>,
+        <code>exists / deleteFile / mkdir / listDir</code> — jail em
+        <code>/local</code> e <code>/sd</code></td></tr>
+        <tr><td><code>Net</code></td><td><code>get(url) / getJSON(url)</code>,
+        <code>download(url, destino [, progresso])</code> streaming,
+        <code>isConnected()</code> — HTTPS com o bundle de CAs</td></tr>
+        <tr><td><code>Storage</code></td><td>key/value privado por pacote (API 12+): <code>get/set/clearFor(pkg)</code></td></tr>
+        <tr><td><code>AI</code> <span class="pill dim">S3</span></td><td><code>AI.chat(prompt)</code> — IA on-device (placas com PSRAM)</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="note tip">
+      <span class="n-ico">✓</span>
+      <p><b>Comece pelo SDK emulador.</b> <code>tools/sdk/celer.js</code> roda seu
+      main.js <i>headless</i> no PC e renderiza PNGs do framebuffer — itere sem placa
+      e valide o visual antes do <code>apps install</code>.</p>
+    </div>
+
+    <h2 id="limites">Limites (o hub valida no publish) <a class="hash" href="#limites">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Regra</th><th>Limite</th><th>Erro</th></tr></thead>
+      <tbody>
+        <tr><td><code>main.js</code> (+ módulos .js)</td><td>≤ 48 KB <span class="pill dim">≤ 128 KB com requires psram</span></td><td>400 / 413</td></tr>
+        <tr><td>qualquer .js individual &gt; 30 KB</td><td>exige <code>api ≥ 6</code> (truncamento em fw antigo)</td><td>400</td></tr>
+        <tr><td><code>icon.png</code></td><td>≤ 16 KB + magic bytes PNG</td><td>400 / 413</td></tr>
+        <tr><td>extras (multi-arquivo)</td><td>≤ 16 arquivos, ≤ 128 KB cada, ≤ 256 KB somados</td><td>400 / 413</td></tr>
+        <tr><td>extensões de extras</td><td>.js .png .wav .json .bin</td><td>400</td></tr>
+        <tr><td>zip inteiro (payload)</td><td>≤ 48 MB comprimido / 64 MB descomprimido</td><td>413</td></tr>
+        <tr><td><code>version</code> nova</td><td>sempre &gt; que a atual do pacote (ou <code>force=1</code>)</td><td>409</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="no-device">Testar no aparelho <a class="hash" href="#no-device">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — do código ao vidro em segundos</div><pre># instala a pasta local e ABRE o app (--run encerra o anterior)
+python3 tools/celerctl.py -p /dev/ttyUSB1 apps install minha-pasta --run
+
+# loop de desenvolvimento: watch + reload + logs ao salvar
+python3 tools/celerctl.py -p /dev/ttyUSB1 dev
+
+# logs do app em tempo real
+python3 tools/celerctl.py -p /dev/ttyUSB1 logcat
+
+# debugger Duktape: breakpoints, step, eval no app rodando
+python3 tools/celerctl.py -p /dev/ttyUSB1 debug "App Store"</pre></div>
+    <p>O <code>apps install</code> também roda um <b>lint</b> do pacote (mesmo do CI)
+    — ele recusa campos gerenciados pelo hub e alerta <code>permissions</code> ausente:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>lint do celerctl</div><pre>erro: app.json:0:0 campo "published_at" e computado pelo hub: nunca setar a mao
+aviso: app.json:0:0 sem campo permissions: o firmware concede TODAS (fs/net/gpio/system)</pre></div>
+
+    <h2 id="rodando">É isto rodando <a class="hash" href="#rodando">#</a></h2>
+    <div class="shot-grid tight rv">
+      <figure class="shot wide"><div class="frame"><img src="img/gif-snake.gif" alt="Snake jogando no CYD"></div>
+        <figcaption><b>Snake</b> · 8 jogadas reais injetadas via <code>celerctl swipe</code></figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-2048.png" alt="2048 no CYD"></div>
+        <figcaption><b>2048</b> · tema do sistema, recorde persistido em /local</figcaption></figure>
+      <figure class="shot wide"><div class="frame"><img src="img/cyd-terminal.png" alt="Terminal no CYD"></div>
+        <figcaption><b>Terminal</b> · shell sobre o FS real com teclado ancorado</figcaption></figure>
+    </div>
+
+    <h2 id="publicar">Publicar na loja <a class="hash" href="#publicar">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — zipa a pasta e envia ao hub</div><pre>python3 tools/publish_app.py minha-pasta \
+  --hub https://os.celer.tec.br --token $CELER_HUB_TOKEN
+
+# resposta:  {"ok": true, "package": "dev.maikeu.ola", "version": "1.0.0", …}</pre></div>
+    <ul>
+      <li>O token precisa do escopo <code>apps</code> (ou <code>*</code>) — veja
+      <a href="seguranca.html#tokens">tokens</a>.</li>
+      <li>Republicar exige versão maior; quem publica primeira vez um
+      <code>packageName</code> vira o <b>dono</b> dele — só root força por cima.</li>
+      <li>Campos <code>size/md5/published_at/publisher/files</code> são computados no
+      servidor; o catálogo reflete na hora (gerado na rota).</li>
+    </ul>
+    <p>Equivalentes diretos por HTTP (o que a CLI faz):</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>curl</div><pre>curl -H "Authorization: Bearer $CELER_HUB_TOKEN" \
+     -F "file=@minha-pasta.zip" \
+     https://os.celer.tec.br/admin/apps</pre></div>
+
+    <div class="note info">
+      <span class="n-ico">i</span>
+      <p>Quer ver todos os apps publicados com metadados, MD5 e downloads?
+      O <a href="/#loja">portal</a> renderiza o catálogo inteiro — ou chamada única a
+      <code>/store/all.json</code>.</p>
+    </div>
+  </article>
+
+  <nav class="pager">
+    <a href="loja.html"><span class="dir">← anterior</span><span class="t">App Store &amp; loja</span></a>
+    <a class="next" href="ota.html"><span class="dir">próximo →</span><span class="t">OTA &amp; firmware</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="loja.html">contrato da loja</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O ecossistema · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html" class="on"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Comece aqui</span>
+  <h1 class="doc-title">O <strong>ecossistema</strong> CelerOS</h1>
+  <p class="lead">CelerOS é um sistema operacional GUI open-source (fork GPL-3.0 do
+  <b>KryonOS</b>) para ESP32 com runtime de apps em JavaScript. O <b>hub</b> — este
+  servidor, <code>os.celer.tec.br</code> — é a nuvem mínima que o ecossistema precisa:
+  loja de apps, canais OTA, ajuda online e portal. Nada mais.</p>
+
+  <div class="meta-row">
+    <span class="pill get">leitura pública</span>
+    <span class="pill post">escrita só com token</span>
+    <span class="pill dim">um serviço FastAPI</span>
+  </div>
+
+  <article>
+    <h2 id="diagrama">O mapa completo <a class="hash" href="#diagrama">#</a></h2>
+    <p>Quatro clientes, um servidor. Os três primeiros vivem no dispositivo; o quarto,
+    no seu navegador:</p>
+
+    <figure class="diagram rv">
+      <svg viewBox="0 0 760 420" width="760" height="420" role="img" aria-label="Diagrama do ecossistema CelerOS">
+        <defs>
+          <linearGradient id="gnode" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#182347"/><stop offset="1" stop-color="#101a36"/>
+          </linearGradient>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3edbf0"/>
+          </marker>
+        </defs>
+
+        <!-- dispositivo -->
+        <rect x="30" y="60" width="200" height="300" rx="18" fill="url(#gnode)" stroke="#24325e"/>
+        <text x="130" y="92" text-anchor="middle" fill="#e8edf8" font-size="15" font-weight="700">DISPOSITIVO</text>
+        <text x="130" y="112" text-anchor="middle" fill="#93a3c8" font-size="11.5">CYD · SmartDisplay · watch · dog · devkit</text>
+
+        <rect x="52" y="132" width="156" height="46" rx="10" fill="#0b1220" stroke="#24325e"/>
+        <text x="130" y="159" text-anchor="middle" fill="#3edbf0" font-size="12.5">App Store (JS)</text>
+        <rect x="52" y="188" width="156" height="46" rx="10" fill="#0b1220" stroke="#24325e"/>
+        <text x="130" y="215" text-anchor="middle" fill="#3edbf0" font-size="12.5">Settings · OTA</text>
+        <rect x="52" y="244" width="156" height="46" rx="10" fill="#0b1220" stroke="#24325e"/>
+        <text x="130" y="271" text-anchor="middle" fill="#3edbf0" font-size="12.5">Ajuda</text>
+        <rect x="52" y="300" width="156" height="40" rx="10" fill="#0b1220" stroke="#24325e"/>
+        <text x="130" y="324" text-anchor="middle" fill="#93a3c8" font-size="11.5">celerctl (USB/WiFi)</text>
+
+        <!-- hub -->
+        <rect x="530" y="90" width="200" height="240" rx="18" fill="url(#gnode)" stroke="#2b4be0"/>
+        <text x="630" y="122" text-anchor="middle" fill="#e8edf8" font-size="15" font-weight="700">CELEROS HUB</text>
+        <text x="630" y="141" text-anchor="middle" fill="#93a3c8" font-size="11.5">FastAPI · os.celer.tec.br</text>
+        <rect x="548" y="158" width="164" height="38" rx="9" fill="#0b1220" stroke="#24325e"/>
+        <text x="630" y="181" text-anchor="middle" fill="#e8edf8" font-size="12">/store · catálogo</text>
+        <rect x="548" y="204" width="164" height="38" rx="9" fill="#0b1220" stroke="#24325e"/>
+        <text x="630" y="227" text-anchor="middle" fill="#e8edf8" font-size="12">/updates · canais OTA</text>
+        <rect x="548" y="250" width="164" height="38" rx="9" fill="#0b1220" stroke="#24325e"/>
+        <text x="630" y="273" text-anchor="middle" fill="#e8edf8" font-size="12">/help · artigos</text>
+        <rect x="548" y="296" width="164" height="26" rx="9" fill="#0b1220" stroke="#24325e"/>
+        <text x="630" y="313" text-anchor="middle" fill="#93a3c8" font-size="10.5">/admin · publish (token)</text>
+
+        <!-- fluxos -->
+        <path class="flow" d="M208 155 C 340 155, 400 177, 546 177" fill="none" stroke="#3edbf0" stroke-width="1.8" marker-end="url(#arr)"/>
+        <text x="368" y="128" text-anchor="end" fill="#93a3c8" font-size="11">GET /store/*.json + main.js</text>
+
+        <path class="flow" d="M208 211 C 340 211, 400 223, 546 223" fill="none" stroke="#3edbf0" stroke-width="1.8" marker-end="url(#arr)"/>
+        <text x="377" y="248" text-anchor="middle" fill="#93a3c8" font-size="11">GET /updates/&lt;placa&gt;/update.json</text>
+
+        <path class="flow" d="M208 267 C 340 267, 400 269, 546 269" fill="none" stroke="#3edbf0" stroke-width="1.8" marker-end="url(#arr)"/>
+        <text x="377" y="291" text-anchor="middle" fill="#93a3c8" font-size="11">GET /help/*.json</text>
+
+        <path class="flow" d="M130 300 C 130 380, 400 392, 630 334" fill="none" stroke="#ffce6b" stroke-width="1.8" marker-end="url(#arr)"/>
+        <text x="205" y="369" text-anchor="start" fill="#ffce6b" font-size="11">screencap · shell · apps · ota push</text>
+
+        <!-- dev -->
+        <rect x="300" y="30" width="160" height="44" rx="10" fill="url(#gnode)" stroke="#24325e" class="pulse"/>
+        <text x="380" y="56" text-anchor="middle" fill="#e8edf8" font-size="12.5">DEV / CI (token)</text>
+        <path class="flow" d="M380 74 L 380 150" fill="none" stroke="#4ade80" stroke-width="1.6" marker-end="url(#arr)"/>
+        <path class="flow" d="M460 52 C 520 52, 500 100, 546 120" fill="none" stroke="#4ade80" stroke-width="1.6" marker-end="url(#arr)"/>
+        <text x="500" y="40" text-anchor="middle" fill="#4ade80" font-size="11">publish_app / publish_firmware</text>
+
+        <!-- navegador -->
+        <rect x="300" y="330" width="160" height="40" rx="10" fill="url(#gnode)" stroke="#24325e"/>
+        <text x="380" y="354" text-anchor="middle" fill="#93a3c8" font-size="12">navegador (portal)</text>
+      </svg>
+      <figcaption>Todos os fluxos do ecossistema. Azul: leitura pública do device. Verde: publicação autenticada. Âmbar: celerctl por USB/WiFi.</figcaption>
+    </figure>
+
+    <h2 id="pecas">As peças <a class="hash" href="#pecas">#</a></h2>
+    <div class="cards">
+      <div class="card"><div class="c-ico">⛁</div><h3>Firmware CelerOS</h3>
+      <p>ESP32 (IDF) com launcher em immediate-mode sobre LovyanGFX, engine JS
+      <b>Duktape</b> (ES5), OTA de slots A/B, WiFi/BLE, IA on-device e voz. Repo
+      <code>CelerOS</code> — <code>CELEROS_API_LEVEL</code> vigente: <b>24</b>.</p></div>
+      <div class="card"><div class="c-ico">☁</div><h3>Hub (este servidor)</h3>
+      <p>Um serviço FastAPI único: catálogo da loja gerado <b>na rota</b> (o disco é a
+      verdade), canais OTA por placa, ajuda online e portal. Leitura pública,
+      escrita com <b>token + escopo</b>.</p></div>
+      <div class="card"><div class="c-ico">‣</div><h3>celerctl</h3>
+      <p>Ferramenta USB estilo <code>adb</code> em Python: shell, push/pull de
+      arquivos, <code>screencap</code> (dump do framebuffer), <code>tap</code>/<code>swipe</code>,
+      install de apps e gravação OTA sem esptool.</p></div>
+      <div class="card"><div class="c-ico">◫</div><h3>App Store no device</h3>
+      <p>App de sistema em JS que lê o catálogo do hub, baixa com MD5 por arquivo e
+      instala com rename atômico — inclusive o <b>self-update</b> dela mesma.</p></div>
+    </div>
+
+    <h2 id="principios">Princípios de projeto <a class="hash" href="#principios">#</a></h2>
+    <ul>
+      <li><b>O disco é a fonte da verdade.</b> O catálogo da loja não é um banco: as
+      rotas <code>/store/*.json</code> escaneiam <code>content/store/apps/</code> a cada
+      request. Publicar = gravar arquivo. Remover = apagar pasta.</li>
+      <li><b>Nada de URL de produção em arquivo.</b> As URLs absolutas do catálogo e do
+      OTA usam o <code>BASE_URL</code> do servidor em execução — o mesmo conteúdo serve
+      dev e produção.</li>
+      <li><b>Compatibilidade é contrato.</b> O firmware recusa manifest OTA abaixo do
+      próprio nível de API e apps declaram o <code>api</code> mínimo que exigem. O hub
+      valida os dois lados no publish.</li>
+      <li><b>Ajuda sem acentos, wiki com.</b> O app Ajuda do dispositivo lê texto puro
+      sem acentuação (a fonte do device não tem glifos acentuados); esta wiki é web
+      e escreve português completo.</li>
+    </ul>
+
+    <h2 id="contratos">Contratos em uma tela <a class="hash" href="#contratos">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Cliente</th><th>Lê</th><th>Contrato</th></tr></thead>
+      <tbody>
+        <tr><td>App Store (JS)</td><td><code>/store/index.json</code> → categoria → <code>app.json</code> + <code>main.js</code></td><td>loja v3</td></tr>
+        <tr><td>Settings · OTA</td><td><code>/updates/&lt;canal&gt;/update.json</code> → <code>firmware.bin</code></td><td>OTA v2 (api_version, variant)</td></tr>
+        <tr><td>Ajuda</td><td><code>/help/index.json</code> → categoria → artigo</td><td>texto puro sem acentos</td></tr>
+        <tr><td>Portal (navegador)</td><td><code>/store/all.json</code>, <code>/api/info</code>, <code>/help/*</code></td><td>só leitura</td></tr>
+        <tr><td>CI / dev</td><td><code>POST /admin/*</code> com <code>Authorization: Bearer</code></td><td>escopos <code>apps</code>/<code>updates</code>/<code>*</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Cada contrato tem página própria: <a href="loja.html">loja</a>,
+    <a href="ota.html">OTA</a> e <a href="api-hub.html">API do hub</a>.</p>
+
+    <h2 id="numeros">O ecossistema em números <a class="hash" href="#numeros">#</a></h2>
+    <ul>
+      <li><b>5 placas</b> com canal OTA: CYD (esp32), SmartDisplay 4848S040,
+      Waveshare AMOLED 2.06 (relógio), Spotpear ZZ-PET (cachorro) e devkit — veja
+      <a href="placas.html">a página de placas</a>.</li>
+      <li><b>24 apps</b> na loja em 6 categorias</li>
+      <li><b>9 artigos</b> de ajuda em 3 categorias</li>
+      <li><b>67 checks</b> de teste do hub (<code>tools/test_api.py</code>) rodando offline contra um TestClient</li>
+    </ul>
+  </article>
+
+  <nav class="pager">
+    <a href="index.html"><span class="dir">← anterior</span><span class="t">Visão da wiki</span></a>
+    <a class="next" href="placas.html"><span class="dir">próximo →</span><span class="t">Placas suportadas</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="api-hub.html">API</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API do hub · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html" class="on"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page">
+  <span class="kicker">Referência</span>
+  <h1 class="doc-title">API do <strong>hub</strong></h1>
+  <p class="lead">Serviço único FastAPI (<code>stacks/.celeros-hub/api/app.py</code> —
+  um arquivo, ~850 linhas). Leitura é pública por design; escrita exige
+  <code>Authorization: Bearer</code> com escopo. Os botões <b>▶ testar</b> abaixo
+  executam de verdade contra o hub que está servindo esta página — só endpoints GET
+  públicos.</p>
+
+  <div class="meta-row">
+    <span class="pill get">público</span>
+    <span class="pill post">escopo apps</span>
+    <span class="pill del">escopo updates</span>
+    <span class="pill dim">JSON em tudo (404 incluso)</span>
+  </div>
+
+  <article>
+    <h2 id="saude">Saúde &amp; estado <a class="hash" href="#saude">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Retorna</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>/health</code></td><td><span class="pill get">GET</span></td>
+          <td><code>{"status":"ok","version":"0.6.0"}</code> — usado pelo healthcheck do deploy</td>
+          <td><button class="try" data-ep="/health">▶</button></td></tr>
+        <tr><td><code>/api/info</code></td><td><span class="pill get">GET</span></td>
+          <td>service, versão, base_url, uptime, <code>firmware.api_level</code>, boards,
+          contagens da loja, downloads por app + total, canais OTA
+          (versão/api_version/variant/hasFirmware/updated) — o "everything" do
+          monitoramento</td>
+          <td><button class="try" data-ep="/api/info">▶</button></td></tr>
+        <tr><td><code>/api/docs</code> · <code>/api/openapi.json</code></td><td><span class="pill get">GET</span></td>
+          <td>Swagger — só existe com <code>HUB_DOCS=1</code> (desligado em produção)</td>
+          <td><span class="pill dim">off</span></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="loja-rotas">Loja <a class="hash" href="#loja-rotas">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Retorna</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>/store/index.json</code></td><td><span class="pill get">GET</span></td>
+          <td>índice: <code>{name, base, updated, categories:{nome→url}}</code> com atalho "Todos"</td>
+          <td><button class="try" data-ep="/store/index.json">▶</button></td></tr>
+        <tr><td><code>/store/all.json</code></td><td><span class="pill get">GET</span></td>
+          <td>união das categorias: <code>{category:"Todos", updated, apps:{pkg→entry}}</code></td>
+          <td><button class="try" data-ep="/store/all.json">▶</button></td></tr>
+        <tr><td><code>/store/&lt;slug&gt;.json</code></td><td><span class="pill get">GET</span></td>
+          <td>categoria única (slug do nome); <code>all</code> aqui → 409 apontando o caminho certo</td>
+          <td><button class="try" data-ep="/store/arcade.json">▶</button></td></tr>
+        <tr><td><code>/store/apps/&lt;pkg&gt;/main.js</code></td><td><span class="pill get">GET</span></td>
+          <td>o app com <code>text/javascript</code> + <code>no-cache</code>; <b>conta download</b></td>
+          <td><button class="try" data-ep="/store/apps/celeros.2048/app.json">▶ app.json</button></td></tr>
+        <tr><td><code>/store/apps/&lt;pkg&gt;/…</code></td><td><span class="pill get">GET</span></td>
+          <td>estático: app.json, icon.png, extras multi-arquivo</td>
+          <td></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="ota-rotas">OTA <a class="hash" href="#ota-rotas">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Retorna</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>/updates/&lt;canal&gt;/update.json</code></td><td><span class="pill get">GET</span></td>
+          <td>manifest do canal (no-cache)</td>
+          <td><button class="try" data-ep="/updates/esp32/update.json">▶</button></td></tr>
+        <tr><td><code>/updates/&lt;canal&gt;/firmware.bin</code></td><td><span class="pill get">GET</span></td>
+          <td>binário quando o canal tem (servido estático)</td>
+          <td></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="ajuda-rotas">Ajuda &aarr; dispositivo <a class="hash" href="#ajuda-rotas">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Retorna</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>/help/index.json</code></td><td><span class="pill get">GET</span></td>
+          <td><code>{categories:[{name,url}]}</code></td>
+          <td><button class="try" data-ep="/help/index.json">▶</button></td></tr>
+        <tr><td><code>/help/categories/&lt;slug&gt;.json</code></td><td><span class="pill get">GET</span></td>
+          <td><code>{articles:[{title,url}]}</code></td>
+          <td><button class="try" data-ep="/help/categories/comecando.json">▶</button></td></tr>
+        <tr><td><code>/help/articles/&lt;slug&gt;.json</code></td><td><span class="pill get">GET</span></td>
+          <td><code>{content:"…"}</code> — texto puro <b>sem acentos</b></td>
+          <td><button class="try" data-ep="/help/articles/ota.json">▶</button></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="publish">Admin — publicar &amp; remover <a class="hash" href="#publish">#</a></h2>
+    <p>Tudo aqui exige Bearer com escopo; sem nenhum token configurado o
+    <code>/admin</code> inteiro responde <code>503</code>.</p>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Rota</th><th></th><th>Escopo</th><th>Corpo / efeito</th></tr></thead>
+      <tbody>
+        <tr><td><code>/admin/whoami</code></td><td><span class="pill get">GET</span></td><td>qualquer token</td>
+          <td><code>{"name","scopes"}</code> — confere token do CI sem risco</td></tr>
+        <tr><td id="publish-app-row"><code>/admin/apps</code></td><td><span class="pill post">POST</span></td><td><code>apps</code></td>
+          <td>multipart <code>file</code> (zip do pacote) + form <code>force</code>.
+          Valida app.json, limites, dono e anti-downgrade; grava atômico em
+          <code>store/apps/&lt;pkg&gt;</code>; retorna md5/size + contagem da loja</td></tr>
+        <tr><td><code>/admin/apps/&lt;pkg&gt;</code></td><td><span class="pill del">DELETE</span></td><td><code>apps</code></td>
+          <td>remove o pacote (regra de dono; root sempre)</td></tr>
+        <tr><td><code>/admin/updates/&lt;canal&gt;</code></td><td><span class="pill post">POST</span></td><td><code>updates</code></td>
+          <td>multipart <code>firmware</code> (bin, opcional) + form <code>update.json</code>
+          (string JSON) + <code>force</code>. Valida semver/api_version/variant,
+          anti-rollback; grava bin por rename</td></tr>
+        <tr><td><code>/admin/updates/&lt;canal&gt;</code></td><td><span class="pill del">DELETE</span></td><td><code>updates</code></td>
+          <td>remove o canal inteiro</td></tr>
+      </tbody>
+    </table></div>
+
+    <p>Exemplo com o curl puro:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre># quem sou eu?
+curl -s -H "Authorization: Bearer $TOKEN" https://os.celer.tec.br/admin/whoami
+
+# publicar firmware no canal da CYD
+curl -H "Authorization: Bearer $TOKEN_CI" \
+     -F "firmware=@CelerOS.bin" \
+     -F 'update.json={"version":"1.8.0","changelog":"- SD no CYD"}' \
+     https://os.celer.tec.br/admin/updates/esp32</pre></div>
+
+    <h2 id="erros">Erros <a class="hash" href="#erros">#</a></h2>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Status</th><th>Quando</th></tr></thead>
+      <tbody>
+        <tr><td><code>400</code></td><td>metadado inválido (packageName/semver/api/canal), extensão fora da lista, colisão de nome no zip, .js grande com api baixa</td></tr>
+        <tr><td><code>403</code></td><td>sem/expirado token, escopo insuficiente, dono do pacote diferente</td></tr>
+        <tr><td><code>409</code></td><td>versão ≤ atual (app ou canal) sem <code>force</code></td></tr>
+        <tr><td><code>413</code></td><td>limites de tamanho (body, zip descomprimido, .js total, icon, assets)</td></tr>
+        <tr><td><code>429</code></td><td>10 falhas de auth em 10 min do mesmo IP → bloqueio 15 min (Retry-After)</td></tr>
+        <tr><td><code>503</code></td><td>nenhum token configurado no servidor (admin desligado)</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note info">
+      <span class="n-ico">i</span>
+      <p><b>Headers de segurança em tudo</b> (<code>nosniff</code>, <code>X-Frame-Options: DENY</code>,
+      <code>no-referrer</code>) e <b>404 sempre JSON</b> — <code>/api/*</code> e
+      <code>/admin/*</code> com <code>{"detail":"nao encontrado"}</code>. Os mounts de
+      conteúdo (<code>/store</code>, <code>/updates</code>, <code>/help</code>) servem com
+      <code>no-cache</code> para o device revalidar; <code>/assets</code> tem ETag normal.</p>
+    </div>
+
+    <h2 id="curl-tour">Tour de 60 segundos <a class="hash" href="#curl-tour">#</a></h2>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — a loja inteira pelo terminal</div><pre>curl -s os.celer.tec.br/health
+curl -s os.celer.tec.br/store/index.json | jq .categories
+curl -s os.celer.tec.br/store/all.json | jq '.apps | keys'
+curl -s os.celer.tec.br/store/apps/celeros.2048/app.json | jq .
+curl -s os.celer.tec.br/updates/esp32/update.json | jq .version
+curl -s os.celer.tec.br/api/info | jq '{apps:.store.apps, downloads:.downloads_total}'</pre></div>
+  </article>
+
+  <nav class="pager">
+    <a href="ota.html"><span class="dir">← anterior</span><span class="t">OTA &amp; firmware</span></a>
+    <a class="next" href="celerctl.html"><span class="dir">próximo →</span><span class="t">celerctl (USB)</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="seguranca.html">segurança</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

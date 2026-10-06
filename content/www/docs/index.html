@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wiki · CelerOS Hub</title>
+<meta name="description" content="Documentação completa do ecossistema CelerOS: placas, loja de apps, OTA, desenvolvimento de apps em JavaScript e a API do hub.">
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html" class="on"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page wide">
+  <div class="hero-land rv in">
+    <img class="hero-logo" src="/assets/celer_logo.png" alt="Celer">
+    <h1>Wiki do <strong>ecossistema CelerOS</strong></h1>
+    <p class="sub">Tudo sobre o CelerOS e o hub <b>os.celer.tec.br</b>: as placas, a loja de apps
+    que o dispositivo lê, os canais OTA, o desenvolvimento de apps em JavaScript e a
+    operação do servidor — com screenshots reais capturados do framebuffer das placas
+    via <a href="celerctl.html">celerctl</a>.</p>
+  </div>
+
+  <div class="stats-row rv" data-hub-info>
+    <div class="stat"><div class="v" data-st="apps">—</div><div class="l">apps na loja</div></div>
+    <div class="stat"><div class="v" data-st="cats">—</div><div class="l">categorias</div></div>
+    <div class="stat"><div class="v" data-st="dl">—</div><div class="l">downloads</div></div>
+    <div class="stat"><div class="v" data-st="boards">—</div><div class="l">canais OTA</div></div>
+    <div class="stat"><div class="v" data-st="api">—</div><div class="l">API level do firmware</div></div>
+    <div class="stat"><div class="v" data-st="ver">—</div><div class="l">versão do hub</div></div>
+  </div>
+  <p style="text-align:center;color:var(--dim);font-size:12.5px;margin-top:-10px">
+    ↑ números ao vivo de <code>/api/info</code> — o mesmo endpoint que o denv monitora.</p>
+
+  <h2 class="rv" style="text-align:center;font-size:22px;margin-top:40px">Nas telas de verdade</h2>
+  <div class="mosaic rv">
+    <div class="m"><img src="img/cyd-launcher.png" alt="Launcher na placa CYD"><span class="tag">CYD · launcher</span></div>
+    <div class="m"><img src="img/sd-store-todos.png" alt="App Store na SmartDisplay"><span class="tag">SmartDisplay · loja</span></div>
+    <div class="m"><img src="img/watch-watchface.png" alt="Watchface no relógio"><span class="tag">Watch · watchface</span></div>
+    <div class="m"><img src="img/dog-main.png" alt="Tela do cachorro robô"><span class="tag">Dog · status</span></div>
+    <div class="m"><img src="img/cyd-snake.png" alt="Snake no CYD"><span class="tag">CYD · Snake</span></div>
+    <div class="m"><img src="img/sd-ota.png" alt="Tela de atualização OTA"><span class="tag">SmartDisplay · OTA</span></div>
+  </div>
+
+  <h2 class="rv" style="text-align:center;font-size:22px;margin-top:34px">Por onde começar</h2>
+  <div class="cards rv">
+    <a class="card" href="visao-geral.html">
+      <div class="c-ico">◎</div><h3>O ecossistema</h3>
+      <p>Firmware, hub, celerctl e App Store — como as peças se conectam.</p></a>
+    <a class="card" href="placas.html">
+      <div class="c-ico">▤</div><h3>Placas suportadas</h3>
+      <p>As 5 placas com tela, canal OTA e o que cada uma tem de especial.</p></a>
+    <a class="card" href="comecando.html">
+      <div class="c-ico">▶</div><h3>Primeiros passos</h3>
+      <p>Do flash ao primeiro app instalado — provision, WiFi, loja e OTA.</p></a>
+    <a class="card" href="desenvolver-apps.html">
+      <div class="c-ico">{ }</div><h3>Desenvolver apps</h3>
+      <p>JavaScript ES5 no Duktape, canvas 240×320, limites e publicação na loja.</p></a>
+    <a class="card" href="ota.html">
+      <div class="c-ico">⇅</div><h3>OTA &amp; firmware</h3>
+      <p>Canais por placa, slots A/B, anti-rollback e o contrato do update.json.</p></a>
+    <a class="card" href="api-hub.html">
+      <div class="c-ico">⇄</div><h3>API do hub</h3>
+      <p>Todas as rotas — leitura pública, escrita com token e escopo.</p></a>
+    <a class="card" href="celerctl.html">
+      <div class="c-ico">‣</div><h3>celerctl</h3>
+      <p>A ferramenta USB estilo adb: shell, push, screencap, tap, OTA…</p></a>
+    <a class="card" href="seguranca.html">
+      <div class="c-ico">⛨</div><h3>Segurança</h3>
+      <p>Tokens com escopo, uploads validados, rate limit e auditoria.</p></a>
+    <a class="card" href="ops-deploy.html">
+      <div class="c-ico">⚙</div><h3>Deploy &amp; ops</h3>
+      <p>Stack denv, sync de conteúdo, secrets e monitoramento.</p></a>
+  </div>
+
+  <div class="note info rv" style="max-width:none">
+    <span class="n-ico">↗</span>
+    <p>Está com pressa? A receita de 2 minutos: <b>flash → <code>celerctl provision --wifi</code> →
+    abrir a App Store no aparelho → instalar o 2048</b>. O resto desta wiki explica cada
+    peça — inclusive como publicar o seu próprio app e o seu firmware.</p>
+  </div>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · <span data-hub-info>os.celer.tec.br</span></span>
+  <span><a href="/">portal</a> · <a href="/api/info">/api/info</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>
