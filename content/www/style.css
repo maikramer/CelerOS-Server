@@ -105,6 +105,12 @@ main {
   display: grid;
   gap: 22px;
 }
+/* filhos do main-grid encolhem abaixo do min-content: sem isso, a faixa
+   "recém publicado" (flex com itens flex:none) força o track implicito
+   "auto" e vaza da coluna central — página com scroll horizontal e cards
+   cortados na direita em viewports largas. */
+main > * { min-width: 0; }
+#recent-strip, #apps-grid { max-width: 100%; }
 .card {
   background: var(--card);
   border: 1px solid var(--stroke);
@@ -338,6 +344,9 @@ footer {
 
 @media (max-width: 560px) {
   .topbar { flex-direction: column; gap: 6px; }
+  /* 8 links nao cabem em 1 linha: quebra centrada (antes: nav de 442px
+     estourava 390px de viewport com scroll horizontal) */
+  .topbar nav { flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: .95rem; }
   .store-row { flex-direction: column; }
   .store-row .select { width: 100%; }
   /* tabela OTA: mantem canal/versao/binario; esconde o resto */
