@@ -516,6 +516,13 @@ a.card:hover {
   background: linear-gradient(180deg, rgba(15, 24, 48, .7), rgba(11, 18, 32, .9));
   overflow-x: auto;
 }
+/* rótulos com halo: legíveis mesmo quando uma linha do fluxo passa por cima */
+.diagram svg text {
+  paint-order: stroke;
+  stroke: #0b1220;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
 .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 .diagram figcaption { text-align: center; color: var(--dim); font-size: 13px; margin-top: 10px; }
 

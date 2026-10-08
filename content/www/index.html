@@ -4,7 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CelerOS Hub — loja de apps, OTA e ajuda do CelerOS</title>
-<meta name="description" content="Loja de apps, atualizações OTA por placa, central de ajuda e documentação do CelerOS — sistema para ESP32 com runtime JavaScript, IA e voz no dispositivo.">
+<meta name="description" content="Loja de apps, atualizações OTA por placa, central de ajuda e documentação do CelerOS — sistema para ESP32 com runtime JavaScript, matilha CelerNet, IA e voz no dispositivo.">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CelerOS Hub — loja, OTA e matilha do CelerOS">
+<meta property="og:description" content="Loja de apps com atualização pela App Store, canais OTA por placa, central de ajuda e a wiki do ecossistema.">
+<meta property="og:image" content="https://os.celer.tec.br/assets/celeros_logo.png">
 <link rel="icon" type="image/png" href="/assets/celeros_favicon.png">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -19,6 +25,7 @@
     <a href="#placas">Placas</a>
     <a href="#firmware">Firmware</a>
     <a href="#celeros">CelerOS</a>
+    <a href="#matilha">Matilha</a>
     <a href="#ajuda">Ajuda</a>
     <a href="#devs">Devs</a>
     <a href="/docs/" style="color:var(--cyan)">Docs ↗</a>
@@ -47,6 +54,7 @@
     <h2>Loja de apps</h2>
     <span class="pill" id="store-count">carregando…</span>
   </div>
+  <div id="recent-strip" class="recent-strip" hidden></div>
   <p class="muted">Catálogo que a App Store do dispositivo lê. Quando a versão
   publicada aqui é maior que a instalada, a loja do aparelho mostra
   <em>Atualizações (N)</em> — o update valida o checksum antes de trocar o app.
@@ -105,7 +113,7 @@
 <section id="celeros" class="card">
   <div class="card-head">
     <h2>O CelerOS</h2>
-    <span class="pill">firmware 1.5</span>
+    <span class="pill">firmware 1.8 · API 27</span>
   </div>
   <p class="muted">Sistema operacional com GUI e runtime de apps JavaScript
   para ESP32 — fork (GPL-3.0) do
@@ -154,6 +162,56 @@
   </div>
   <p class="muted">Código-fonte e documentação no
   <a href="https://github.com/maikramer/CelerOS">repositório do CelerOS</a>.</p>
+</section>
+
+<section id="matilha" class="card">
+  <div class="card-head">
+    <h2>Matilha — a rede entre as placas</h2>
+    <span class="pill">CelerNet · API 26/27</span>
+  </div>
+  <div class="mesh-hero">
+    <figure class="mesh-shot">
+      <img src="/docs/img/sd-matilha.png"
+           alt="Painel da Matilha na SmartDisplay: Ligada, 3 ouvidos, Celer-Dog e Celer Watch com papel, sinal e saltos">
+      <figcaption>Painel da Matilha numa bancada real: cada placa aparece com o
+      seu papel, sinal em dBm e quantos saltos de distância.</figcaption>
+    </figure>
+    <div class="mesh-copy">
+      <p class="muted">As placas se encontram sozinhas: a <strong>CelerNet</strong> é
+      uma malha BLE em que cada nó anuncia presença e repete o que ouve — sem
+      roteador, sem pareamento, mensagens de até 434 B a 8 saltos. A
+      <strong>matilha</strong> (Pack) mora em cima: papéis por placa — alto-falante,
+      microfone, tela, patas, leds — e a <strong>música itinerante</strong>, que pula
+      de placa em placa retomando do mesmo milissegundo.</p>
+      <p class="muted">E o PC entra no bando: <code>tools/matilha</code> vira um nó
+      de verdade (ouve, manda, faz censo e ping com RTT real).</p>
+      <a class="btn" href="/docs/celernet.html">Guia completo da matilha →</a>
+    </div>
+  </div>
+  <div class="features">
+    <div class="feat">
+      <h3>Malha por advertising</h3>
+      <p>Quadros de 31 B em flood com TTL: BEAT de presença a cada 3 s, unicast
+      fragmentado com cópias espaçadas e relay educado — fora da frente da rajada.</p>
+    </div>
+    <div class="feat">
+      <h3>Papéis sem config</h3>
+      <p><code>Pack.members()</code> entrega o bando com o papel de cada placa e
+      sinal; o hub WiFi vira <em>hub</em> da matilha quando está online.</p>
+    </div>
+    <div class="feat">
+      <h3>Música itinerante</h3>
+      <p><code>System.playMusic</code> sintetiza até 4 trilhas na placa e
+      <code>Pack.handoffMusic()</code> passa a sessão inteira — posição em ms
+      inclusa — pro vizinho com o speaker mais forte.</p>
+    </div>
+    <div class="feat">
+      <h3>Apps da matilha</h3>
+      <p>Sonar (radar com ping real), Coral (orquestra sincronizada), Mural,
+      Sentinela, Batata Quente — e o Pong Duplo por CelerLink, o par-a-par
+      selado com AES.</p>
+    </div>
+  </div>
 </section>
 
 <section id="ajuda" class="card">
@@ -273,6 +331,31 @@ function fillStats() {
     i.firmware?.api_level ?? "?";
 }
 
+// faixa "recém publicado": os 6 apps com published_at mais recente.
+// Apps antigos sem o campo ficam de fora — o strip é sobre novidade.
+function renderRecent() {
+  const strip = document.getElementById("recent-strip");
+  if (!strip) return;
+  const rec = store.apps
+    .filter(a => a.published_at)
+    .sort((a, b) => b.published_at.localeCompare(a.published_at))
+    .slice(0, 6);
+  if (rec.length < 2) { strip.hidden = true; return; }
+  const fmt = iso => {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString("pt-BR",
+      { day: "2-digit", month: "short" }).replace(".", "");
+  };
+  strip.innerHTML = '<span class="rec-label">recém publicado</span>' +
+    rec.map(a => `
+      <a class="rec" href="#/app/${esc(a.pkg)}">
+        <img loading="lazy" src="${a.icon || "/assets/celer_favicon.png"}" alt="">
+        <span class="rec-name">${esc(a.name)}</span>
+        <span class="rec-date">${esc(fmt(a.published_at))}</span>
+      </a>`).join("");
+  strip.hidden = false;
+}
+
 async function loadStore() {
   const grid = document.getElementById("apps-grid");
   try {
@@ -286,6 +369,7 @@ async function loadStore() {
     fillStats();
     document.getElementById("store-count").textContent =
       store.apps.length + (store.apps.length === 1 ? " app" : " apps");
+    renderRecent();
 
     // chips de categoria a partir do catalogo
     const cats = [...new Set(store.apps.map(a => a.category || "Apps"))].sort();

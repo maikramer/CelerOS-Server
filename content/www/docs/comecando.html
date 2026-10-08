@@ -19,6 +19,7 @@
     <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
     <a href="comecando.html" class="on"><span class="ico">▶</span>Primeiros passos</a>
     <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <a href="celernet.html"><span class="ico">≋</span>CelerNet &amp; matilha</a>
     <h4>Construa</h4>
     <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
     <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
@@ -75,10 +76,10 @@ tools/flash_data.sh cyd /dev/ttyUSB1</pre></div>
         <div class="code"><div class="code-head"><span class="dot">▸</span>bash</div><pre>pip install pyserial
 python3 tools/celerctl.py devices</pre></div>
         <p>Saída real com 4 placas ligadas (USB <b>e</b> bridge WiFi):</p>
-        <div class="code"><div class="code-head"><span class="dot">▸</span>devices</div><pre>/dev/ttyUSB1   CELEROS 1.7.0|cyd|api 24|proto 2|chunk 4096|win 1
-/dev/ttyUSB0   CELEROS 1.7.0|smartdisplay_4in|api 24|proto 2|chunk 8192|win 4
-/dev/ttyACM1   CELEROS 1.7.0|spotpear-dog|api 24|proto 2|chunk 8192|win 4
-192.168.0.134:5555 wifi  CELEROS 1.7.0|smartdisplay_4in|api 24|tcp 5555</pre></div>
+        <div class="code"><div class="code-head"><span class="dot">▸</span>devices</div><pre>/dev/ttyUSB1   CELEROS 1.8.0|smartdisplay_4in|api 27|proto 2|chunk 8192|win 4
+/dev/ttyACM0   CELEROS 1.8.0|spotpear-dog|api 27|proto 2|chunk 8192|win 4
+/dev/ttyACM2   CELEROS 1.8.0|waveshare-amoled206|api 27|proto 2|chunk 8192|win 2
+192.168.0.134:5555 wifi  CELEROS 1.8.0|smartdisplay_4in|api 27|tcp 5555</pre></div>
       </div>
       <div class="step">
         <h3>Provisione WiFi (uma vez)</h3>

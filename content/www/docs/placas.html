@@ -19,6 +19,7 @@
     <a href="placas.html" class="on"><span class="ico">▤</span>Placas suportadas</a>
     <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
     <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <a href="celernet.html"><span class="ico">≋</span>CelerNet &amp; matilha</a>
     <h4>Construa</h4>
     <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
     <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
@@ -64,7 +65,7 @@
       unicore e usa a IRAM como heap extra para caber TLS + Duktape.</li>
       <li><b>Tela:</b> ILI9341 320×240 <i>landscape</i>, touch <b>resistivo</b> XPT2046
       com calibração interativa de 5 pontos (persistida em <code>/local/touch_cal_p.bin</code>).</li>
-      <li><b>Extras:</b> LED RGB, LDR (brilho automático), alto-falante, e
+      <li><b>Extras:</b> LED RGB, LDR (brilho automático), alto-falante, <b>sem BLE no build padrão</b> (build experimental <code>build-cyd-bt</code> — fora da matilha), e
       <b>microSD compartilhando o HSPI com o TFT</b> — o cartão monta como segundo
       dispositivo do barramento (multi-device do driver SPI do IDF) e vira o
       <code>/sd</code> com giagas para apps.</li>
@@ -88,7 +89,7 @@
       (acima de 48 KB) e o bundle completo de CAs do TLS vivem à vontade.</li>
       <li><b>Tela:</b> IPS 480×480, touch <b>capacitivo</b> (sem calibração), áudio
       I2S via NS4168.</li>
-      <li><b>Extras:</b> slot microSD dedicado (FAT em <code>/sd</code>) e a variante
+      <li><b>Extras:</b> <b>BLE · matilha CelerNet</b> de série, slot microSD dedicado (FAT em <code>/sd</code>) e a variante
       <b>SmartDisplay Y</b> com relés — firmware próprio e <code>variant</code> de SKU
       no manifest OTA (ex.: <code>smartdisplay-y8</code>).</li>
       <li><b>Canal OTA:</b> <code>smartdisplay_4848S040</code></li>
@@ -105,7 +106,7 @@
     <ul>
       <li><b>Chip:</b> ESP32-S3, display <b>AMOLED redondo 412×502</b> em QSPI, touch
       capacitivo GT911.</li>
-      <li><b>Perfil:</b> relógio de verdade — watchfaces como plugins, notificações do
+      <li><b>Perfil:</b> relógio de verdade — <b>BLE · matilha CelerNet</b> (papel: tela + microfone), watchfaces como plugins, notificações do
       Phone Link (Gadgetbridge) e <i>inset</i> circular: o canvas lógico 240×320 é
       mapeado no vidro redondo com máscara.</li>
       <li><b>Canal OTA:</b> <code>waveshare_amoled206</code></li>
@@ -121,7 +122,7 @@
     </div>
     <ul>
       <li><b>Chip:</b> ESP32-S3, OLED 128×64, servos de marcha, microfone e IMU.</li>
-      <li><b>Perfil:</b> o cachorro de estimação — tela de status (bateria, modo),
+      <li><b>Perfil:</b> o cachorro de estimação — <b>BLE · matilha CelerNet</b> (papel: patas, microfone e leds), tela de status (bateria, modo),
       <b>voz com wake word "Hi Celer"</b> e IA on-device; é a placa do
       <i>dog bench</i> em <code>tools/dog/</code>.</li>
       <li><b>Canal OTA:</b> <code>spotpear_zzpet</code></li>
@@ -138,12 +139,12 @@
 
     <h2 id="comparativo">Comparativo <a class="hash" href="#comparativo">#</a></h2>
     <div class="tblwrap"><table class="tbl">
-      <thead><tr><th>Placa</th><th>Canal OTA</th><th>Chip</th><th>Vidro</th><th>Touch</th><th>PSRAM</th><th>SD</th></tr></thead>
+      <thead><tr><th>Placa</th><th>Canal OTA</th><th>Chip</th><th>Vidro</th><th>Touch</th><th>PSRAM</th><th>SD</th><th>BLE</th></tr></thead>
       <tbody>
-        <tr><td>CYD 2432S028R</td><td><code>esp32</code></td><td>ESP32</td><td>320×240 ILI9341</td><td>resistivo</td><td class="pill warn">não</td><td>compartilhado ✓</td></tr>
-        <tr><td>SmartDisplay 4848S040</td><td><code>smartdisplay_4848S040</code></td><td>ESP32-S3</td><td>480×480 IPS</td><td>capacitivo</td><td class="pill ok">8 MB</td><td>dedicado ✓</td></tr>
-        <tr><td>Waveshare AMOLED 2.06</td><td><code>waveshare_amoled206</code></td><td>ESP32-S3</td><td>412×502 AMOLED ⬤</td><td>capacitivo</td><td class="pill ok">sim</td><td>—</td></tr>
-        <tr><td>Spotpear ZZ-PET</td><td><code>spotpear_zzpet</code></td><td>ESP32-S3</td><td>128×64 OLED</td><td>—</td><td class="pill ok">sim</td><td>—</td></tr>
+        <tr><td>CYD 2432S028R</td><td><code>esp32</code></td><td>ESP32</td><td>320×240 ILI9341</td><td>resistivo</td><td class="pill warn">não</td><td>compartilhado ✓</td><td class="pill warn">experimental</td></tr>
+        <tr><td>SmartDisplay 4848S040</td><td><code>smartdisplay_4848S040</code></td><td>ESP32-S3</td><td>480×480 IPS</td><td>capacitivo</td><td class="pill ok">8 MB</td><td>dedicado ✓</td><td class="pill ok">matilha</td></tr>
+        <tr><td>Waveshare AMOLED 2.06</td><td><code>waveshare_amoled206</code></td><td>ESP32-S3</td><td>412×502 AMOLED ⬤</td><td>capacitivo</td><td class="pill ok">sim</td><td>—</td><td class="pill ok">matilha</td></tr>
+        <tr><td>Spotpear ZZ-PET</td><td><code>spotpear_zzpet</code></td><td>ESP32-S3</td><td>128×64 OLED</td><td>—</td><td class="pill ok">sim</td><td>—</td><td class="pill ok">matilha</td></tr>
         <tr><td>Devkit</td><td><code>devkit</code></td><td>ESP32</td><td>—</td><td>—</td><td>conforme placa</td><td>—</td></tr>
       </tbody>
     </table></div>

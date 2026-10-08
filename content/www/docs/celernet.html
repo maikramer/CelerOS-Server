@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CelerNet &amp; matilha · Wiki CelerOS</title>
+<link rel="icon" href="/assets/celeros_favicon.png">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+<button class="menu-btn" aria-label="Menu">☰</button>
+<aside class="sidebar">
+  <div class="brand"><img src="/assets/celeros_logo.png" alt="CelerOS"><span>docs</span></div>
+  <nav>
+    <h4>Comece aqui</h4>
+    <a href="index.html"><span class="ico">⌂</span>Visão da wiki</a>
+    <a href="visao-geral.html"><span class="ico">◎</span>O ecossistema</a>
+    <h4>Use o CelerOS</h4>
+    <a href="placas.html"><span class="ico">▤</span>Placas suportadas</a>
+    <a href="comecando.html"><span class="ico">▶</span>Primeiros passos</a>
+    <a href="loja.html"><span class="ico">◫</span>App Store &amp; loja</a>
+    <a href="celernet.html" class="on"><span class="ico">≋</span>CelerNet &amp; matilha</a>
+    <h4>Construa</h4>
+    <a href="desenvolver-apps.html"><span class="ico">{ }</span>Desenvolver apps</a>
+    <a href="ota.html"><span class="ico">⇅</span>OTA &amp; firmware</a>
+    <h4>Referência</h4>
+    <a href="api-hub.html"><span class="ico">⇄</span>API do hub</a>
+    <a href="celerctl.html"><span class="ico">‣</span>celerctl (USB)</a>
+    <h4>Operação</h4>
+    <a href="seguranca.html"><span class="ico">⛨</span>Segurança</a>
+    <a href="ops-deploy.html"><span class="ico">⚙</span>Deploy &amp; ops</a>
+  </nav>
+  <div class="side-foot">
+    <a href="/">← portal</a><br>
+    <span data-hub-info>os.celer.tec.br</span><br>
+    GPL-3.0 · fork do KryonOS
+  </div>
+</aside>
+<label class="backdrop"></label>
+
+<div class="content">
+<main class="page wide">
+  <span class="kicker">Use o CelerOS</span>
+  <h1 class="doc-title">CelerNet &amp; a <strong>matilha</strong></h1>
+  <p class="lead">As placas CelerOS se encontram sozinhas: <b>CelerNet</b> é uma malha BLE em que cada
+  nó grita sua presença (BEAT) em <i>advertising</i> e repete o que ouve dos outros — sem
+  infraestrutura, sem roteador, sem pareamento. O <b>Pack</b> (a matilha) mora em cima:
+  papéis por placa (alto-falante, microfone, tela, patas…), mensagens confiáveis e a
+  <b>música itinerante</b> — a festa pula de placa em placa retomando do mesmo milissegundo.</p>
+
+  <div class="meta-row">
+    <span class="pill dim">BLE advertising flood</span>
+    <span class="pill dim">msgs até 434 B</span>
+    <span class="pill dim">PC entra na matilha</span>
+    <span class="pill get">API 26/27</span>
+  </div>
+
+  <article>
+    <h2 id="malha">A malha em uma tela <a class="hash" href="#malha">#</a></h2>
+    <figure class="diagram rv">
+      <svg viewBox="0 0 760 400" width="760" height="400" role="img" aria-label="Diagrama da malha CelerNet">
+        <defs>
+          <linearGradient id="gn2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#182347"/><stop offset="1" stop-color="#101a36"/>
+          </linearGradient>
+          <marker id="arrm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#3edbf0"/>
+          </marker>
+        </defs>
+
+        <!-- alcance dos BEATs (anéis pulsantes) -->
+        <circle cx="200" cy="170" r="118" fill="none" stroke="#2b4be0" stroke-opacity=".28" class="pulse"/>
+        <circle cx="430" cy="120" r="112" fill="none" stroke="#2b4be0" stroke-opacity=".22" class="pulse"/>
+        <circle cx="560" cy="260" r="110" fill="none" stroke="#2b4be0" stroke-opacity=".25" class="pulse"/>
+
+        <!-- nós -->
+        <g>
+          <rect x="150" y="140" width="150" height="58" rx="14" fill="url(#gn2)" stroke="#2b4be0"/>
+          <text x="225" y="164" text-anchor="middle" fill="#e8edf8" font-size="13" font-weight="700">SmartDisplay</text>
+          <text x="225" y="182" text-anchor="middle" fill="#93a3c8" font-size="10.5">tela · som · hub WiFi</text>
+
+          <rect x="390" y="92" width="130" height="56" rx="14" fill="url(#gn2)" stroke="#2b4be0"/>
+          <text x="455" y="115" text-anchor="middle" fill="#e8edf8" font-size="13" font-weight="700">Relógio</text>
+          <text x="455" y="132" text-anchor="middle" fill="#93a3c8" font-size="10.5">tela ⬤ · mic</text>
+
+          <rect x="510" y="236" width="140" height="58" rx="14" fill="url(#gn2)" stroke="#2b4be0"/>
+          <text x="580" y="260" text-anchor="middle" fill="#e8edf8" font-size="13" font-weight="700">Cachorro</text>
+          <text x="580" y="278" text-anchor="middle" fill="#93a3c8" font-size="10.5">patas · mic · leds</text>
+
+          <rect x="40" y="300" width="130" height="52" rx="14" fill="url(#gn2)" stroke="#24325e"/>
+          <text x="105" y="321" text-anchor="middle" fill="#93a3c8" font-size="11.5">PC · tools/matilha</text>
+          <text x="105" y="337" text-anchor="middle" fill="#93a3c8" font-size="10">nó cru via HCI</text>
+        </g>
+
+        <!-- BEAT broadcasts -->
+        <path class="flow" d="M300 165 C 340 150, 350 140, 388 128" fill="none" stroke="#3edbf0" stroke-width="1.6" marker-end="url(#arrm)"/>
+        <path class="flow" d="M290 190 C 380 230, 440 250, 508 258" fill="none" stroke="#3edbf0" stroke-width="1.6" marker-end="url(#arrm)"/>
+        <path class="flow" d="M510 150 C 500 190, 500 220, 540 236" fill="none" stroke="#3edbf0" stroke-width="1.6" marker-end="url(#arrm)"/>
+        <path class="flow" d="M170 290 C 190 250, 200 230, 210 200" fill="none" stroke="#3edbf0" stroke-width="1.6" marker-end="url(#arrm)"/>
+        <text x="360" y="118" fill="#93a3c8" font-size="11">BEAT 3 s — quem sou + papéis</text>
+        <text x="330" y="252" fill="#93a3c8" font-size="11">relay com jitter, TTL 4</text>
+
+        <!-- música itinerante -->
+        <path class="flow" d="M255 140 C 330 60, 480 40, 560 236" fill="none" stroke="#4ade80" stroke-width="1.8" marker-end="url(#arrm)"/>
+        <text x="470" y="47" fill="#4ade80" font-size="11.5">Pack.handoffMusic — a festa pula de placa</text>
+        <text x="470" y="63" fill="#4ade80" font-size="10.5">(música serializada + posição em ms)</text>
+      </svg>
+      <figcaption>Cada nó anuncia um BEAT a cada 3 s e repete quadros alheios (flood com TTL).
+      Verde: envelope de música do Pack viajando por unicast fragmentado.</figcaption>
+    </figure>
+
+    <div class="note info">
+      <span class="n-ico">i</span>
+      <p><b>Quem tem matilha hoje:</b> as placas com BLE no build padrão — SmartDisplay,
+      cachorro (Spotpear) e relógio (Waveshare). A CYD clássica tem um build experimental
+      com NimBLE (<code>build-cyd-bt</code>), mas flash/RAM são limítrofes. O app
+      <b>Matilha</b> avisa na placa sem rádio.</p>
+    </div>
+
+    <h2 id="no-vidro">A matilha no vidro <a class="hash" href="#no-vidro">#</a></h2>
+    <p>Estas telas são da <b>malha real de 3 placas</b> na bancada — cada painel listando
+    os outros dois nós com papel, sinal em dBm e saltos:</p>
+    <div class="shot-grid rv">
+      <figure class="shot"><div class="frame"><img src="img/sd-matilha.png" alt="Painel Matilha na SmartDisplay"></div>
+        <figcaption><b>SmartDisplay</b> · Ligada, 3 ouvidos — Celer-Dog e Celer Watch com papel e sinal</figcaption></figure>
+      <figure class="shot"><div class="frame"><img src="img/dog-matilha.png" alt="Painel Matilha no cachorro"></div>
+        <figcaption><b>Cachorro</b> · MATILHA ON, papel patas·mic·leds</figcaption></figure>
+      <figure class="shot round"><div class="frame"><img src="img/watch-matilha.png" alt="Painel Matilha no relógio"></div>
+        <figcaption><b>Relógio</b> · painel no vidro redondo</figcaption></figure>
+    </div>
+
+    <h2 id="protocolo">O protocolo em números <a class="hash" href="#protocolo">#</a></h2>
+    <p>Quadro de 31 bytes crus no advertising (magic <code>'C''N'</code>, versão 2),
+    sem estrutura AD e sem conexão — por isso alcança tanto e gasta tão pouco:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>quadro v2 — 15 B de cabeçalho</div><pre>'C''N' | ver=2 | tipo | netId(2) | src(2) | dst(2) | seq(2) | ttl | hops | dlen | dados…
+
+BEAT = presença   → dados: [caps(1)][nome NUL]      · a cada 3 s, nó expira em 15 s
+DATA = mensagem   → até 16 B inteiros num quadro
+FRAG = fragmento  → [idx|cópia][total][chunk ≤14 B]  · mensagem máxima 434 B</pre></div>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Limite</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>mensagem máxima</td><td><b>434 B</b> (31 fragmentos × 14 B)</td></tr>
+        <tr><td>TTL (saltos)</td><td>1..8, default <b>4</b></td></tr>
+        <tr><td>vazão por nó</td><td>8 pacotes/s (token bucket, rajada 16) — ~185 ms de ar por quadro</td></tr>
+        <tr><td>presença</td><td>16 nós na tabela; sem BEAT por 15 s = saiu</td></tr>
+        <tr><td>unicast confiável</td><td>1..3 cópias espaçadas 1,5 s + dedup <code>(src,seq,idx)</code></td></tr>
+        <tr><td>relay educado</td><td>jitter por TTL e <b>fora da frente da rajada</b> de fragmentos; supressão se outro já repetiu</td></tr>
+        <tr><td>memória</td><td>estado grande (~3,6 KB) na PSRAM; gate de RAM interna; watchdog do burst</td></tr>
+        <tr><td>rede lógica</td><td><code>netId</code> = hash do nome da rede (default <code>celer</code>) — v1 em claro</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note warn">
+      <span class="n-ico">!</span>
+      <p><b>Sem ACK no rádio.</b> A resposta do protocolo é a resposta da aplicação — um
+      434 B × 2 cópias são 62 quadros (~11 s de ar); mensagens de até 16 B cabem num
+      quadro só e são muito mais confiáveis. O <a href="#apps">Sonar</a> mede perda
+      real com pings de 1 quadro e zero cópias.</p>
+    </div>
+
+    <h2 id="api">A API no JavaScript <a class="hash" href="#api">#</a></h2>
+    <p>Duas camadas: <code>CelerNet.*</code> (transporte cru, API 26/27) e <code>Pack.*</code>
+    (a matilha com papéis e envelopes, API 27). Só existe em placa com BLE — detecte com
+    <code>typeof CelerNet !== "undefined"</code>.</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>main.js — a matilha em 12 linhas</div><pre>if (typeof CelerNet === "undefined") { /* placa sem BLE */ }
+
+CelerNet.start({});                       // entra na malha (nome/rede default)
+
+var bando = Pack.members();               // [{id,name,caps,rssi,hops,lastSeen}]
+                                          //  ordenados por sinal, papel de cada um
+CelerNet.broadcast("olá matilha!");       // 1..434 B (cru) p/ todo mundo, TTL 4
+Pack.send("Celer-Dog", "passeia!");       // unicast confiável por NOME ou id
+                                          //  destino sumido => false (sem throw)
+
+var msg;
+while ((msg = CelerNet.poll())) {         // fila RX (8): {from, fromName, msg, hops, rssi}
+    draw(msg.fromName + ": " + msg.msg);
+}
+while ((msg = Pack.poll())) { }           // envelopes custom (dedup já feito)
+
+Pack.handoffMusic();                      // a música tocando AQUI passa pro
+                                          //  vizinho com speaker mais forte</pre></div>
+    <div class="tblwrap"><table class="tbl">
+      <thead><tr><th>Função</th><th>Retorna</th></tr></thead>
+      <tbody>
+        <tr><td><code>CelerNet.start/stop</code></td><td>bool — o toggle persiste entre boots/apps</td></tr>
+        <tr><td><code>CelerNet.broadcast(msg[, ttl])</code></td><td>bool; msg 1..434 B (objeto vira JSON)</td></tr>
+        <tr><td><code>CelerNet.send(to, msg[, opts])</code> <span class="pill dim">27</span></td><td>bool; unicast com ttl/urgent/copies</td></tr>
+        <tr><td><code>CelerNet.poll()</code> / <code>CelerNet.nodes()</code></td><td>mensagem ou null / presença com caps e hops</td></tr>
+        <tr><td><code>CelerNet.status()</code></td><td>contadores vivos (fila, drops, relays, falhas de TX)</td></tr>
+        <tr><td><code>Pack.me()</code> / <code>Pack.members()</code></td><td>meu papel ({speaker,mic,display,motors,leds,hub}) / o bando</td></tr>
+        <tr><td><code>Pack.send(to, msg)</code> / <code>Pack.poll()</code></td><td>envelopes ≤ 430 B com dedup por msgId</td></tr>
+        <tr><td><code>Pack.handoffMusic([to])</code></td><td>passa a sessão de música (to=0 escolhe o speaker mais forte)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="musica">A música itinerante <a class="hash" href="#musica">#</a></h2>
+    <p>A API 25 trouxe o <code>System.playMusic</code> — um sintetizador de até 4 trilhas
+    (onda quadrada/triângulo/serra ou bateria GM) que toca sem bloquear o app. A API 27
+    fechou o ciclo: <code>handoffMusic</code> serializa a sessão inteira (música + posição
+    em ms) num envelope urgente e o vizinho retoma <b>do mesmo milissegundo</b> — uma
+    orquestra em que a placa que toca pode mudar no meio da música:</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>main.js — 8 bits de festa</div><pre>System.playMusic({
+    bpm: 128, loops: 4,
+    tracks: [
+        { wave: "sq",  vol: 80, notes: [[64,8],[67,8],[71,8],[72,16],[0,16],[64,8]] },
+        { drum: true,  vol: 90, notes: [[36,8],[0,8],[38,8],[0,8],[42,4],[42,4],[38,8]] }
+    ]
+});
+// System.musicPos() → ms · System.musicStop() · System.musicPlaying()
+Pack.handoffMusic("Celer-AB3E");   // entrega e PARA aqui; a outra retoma</pre></div>
+
+    <h2 id="celerlink">CelerLink — o par-a-par <a class="hash" href="#celerlink">#</a></h2>
+    <p>Enquanto a CelerNet é gritaria em advertising, o <b>CelerLink</b> é a conversa
+    reservada: conexão BLE GATT de alta vazão (mensagens de 240 B), pareamento por
+    código de 6 dígitos, bonds no NVS e mensagens seladas com AES-128-GCM (API 21).
+    Liga CelerOS↔CelerOS (telemetria do cachorro, controles remotos) e, novo,
+    <b>PC↔CelerOS</b>. O telefone conecta pelo PhoneLink (Gadgetbridge) no relógio.</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>bash — o PC entra na matilha (tools/matilha)</div><pre>pip install bleak   # só para o 'link'
+
+sudo python3 tools/matilha/matilha.py mesh listen --relay   # nó CelerNet de verdade
+sudo python3 tools/matilha/matilha.py mesh nodes            # quem está no ar
+sudo python3 tools/matilha/matilha.py mesh ping Celer-Dog   # RTT real (app Sonar)
+sudo python3 tools/matilha/matilha.py mesh census           # ID · bateria · uptime
+
+python3 tools/matilha/matilha.py link scan                  # Celer-* por perto
+python3 tools/matilha/matilha.py link send Celer-Dog "sit"  # par-a-par selado</pre></div>
+    <div class="note tip">
+      <span class="n-ico">✓</span>
+      <p>O <code>mesh</code> fala HCI cru (precisa de root e de um adaptador dedicado —
+      pare o bluetoothd ou use <code>--hci 1</code>); o <code>link</code> usa bleak e roda
+      como usuário. Um adaptador não faz os dois ao mesmo tempo.</p>
+    </div>
+
+    <h2 id="apps">Os apps da matilha <a class="hash" href="#apps">#</a></h2>
+    <div class="cards">
+      <div class="card"><div class="c-ico">≋</div><h3>Matilha</h3>
+      <p>App de sistema: liga a malha, mostra quem sou (papel), o bando com
+      sinal/idade, mensagem direta ou pra todos, e o botão de passar a música.</p></div>
+      <div class="card"><div class="c-ico">◉</div><h3>Sonar</h3>
+      <p>Radar em anéis de hops com o papel de cada nó; ping real de 1 quadro
+      (sem cópias — a perda é medida, não mascarada) e censo de bateria.</p></div>
+      <div class="card"><div class="c-ico">♪</div><h3>Coral</h3>
+      <p>Orquestra distribuída: vozes por placa com entrada sincronizada
+      descontando a latência de cada salto.</p></div>
+      <div class="card"><div class="c-ico">▣</div><h3>Mural</h3>
+      <p>Quadro de recados que sincroniza por Trickle (RFC 6206) — alcança até
+      quem estava desligado quando a mensagem nasceu.</p></div>
+      <div class="card"><div class="c-ico">☂</div><h3>Sentinela</h3>
+      <p>Alarme em rede (até 8 hops) com anti-tamper: nó que some do ar dispara
+      o bando. Protegido por PIN.</p></div>
+      <div class="card"><div class="c-ico">◍</div><h3>Batata Quente · Pong Duplo</h3>
+      <p>Jogos da malha: a batata circula por unicast com ACK em broadcast;
+      o Pong Duplo é CelerLink par-a-par de baixa latência.</p></div>
+    </div>
+
+    <h2 id="bench">Bancada e simulador <a class="hash" href="#bench">#</a></h2>
+    <ul>
+      <li><b>PackBench</b> — suíte E2E em 3 placas: presença com papéis, RTT de unicast
+      com ACK, broadcast com confirmações e handoff de música com prova de retomada.</li>
+      <li><b>MeshLab</b> — bateria A/B das variantes de rádio
+      (<code>/local/celernet_tune.txt</code>: duração do adv, relay diferido, supressão).</li>
+      <li><b>meshsim</b> — simulador no host (<code>node test/meshsim/run.js</code>): apps
+      reais em N nós virtuais com perda por enlace, filas e relógio virtual.</li>
+    </ul>
+    <p>O resultado dessa bancada está nos números da tabela acima — o relay "fora da
+    frente" da rajada de fragmentos, por exemplo, tirou a entrega de 100 B de 3-4/10
+    para praticamente total na bancada de 3 placas.</p>
+  </article>
+
+  <nav class="pager">
+    <a href="loja.html"><span class="dir">← anterior</span><span class="t">App Store &amp; loja</span></a>
+    <a class="next" href="desenvolver-apps.html"><span class="dir">próximo →</span><span class="t">Desenvolver apps</span></a>
+  </nav>
+</main>
+
+<footer class="doc-foot">
+  <span>CelerOS Hub · os.celer.tec.br</span>
+  <span><a href="/">portal</a> · <a href="desenvolver-apps.html">API JS</a> · GPL-3.0</span>
+</footer>
+</div>
+<script src="docs.js"></script>
+</body>
+</html>

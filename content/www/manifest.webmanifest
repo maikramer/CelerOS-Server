@@ -1,0 +1,14 @@
+{
+  "name": "CelerOS Hub",
+  "short_name": "CelerOS",
+  "description": "Loja de apps, canais OTA, ajuda e a wiki do ecossistema CelerOS.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/assets/celeros_favicon.png", "sizes": "128x128", "type": "image/png" }
+  ]
+}
