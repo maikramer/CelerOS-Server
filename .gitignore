@@ -8,3 +8,9 @@ portal-*.png
 
 # credenciais locais do hub (NUNCA commitar)
 env/
+
+# logs de runtime do hub (application/error/audit)
+logs/
+
+# estado local da ferramenta de agente (.zcode/plans etc)
+.zcode/
