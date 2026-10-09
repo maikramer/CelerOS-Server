@@ -11,6 +11,16 @@ Cobre o contrato do fluxo de ATUALIZACAO de apps:
   - pacote multi-arquivo: extras gravados/servidos, campo gerenciado "files",
     colisao de nome, extensao invalida, tetos de asset/contagem
   - contador de downloads em /api/info
+DEPS (repositorio de dependencias JS compartilhadas):
+  - publish de dep (zip <nome>.js + dep.json) grava campos gerenciados em
+    store/deps/<nome>/<versao>/; indice /store/deps.json com size/md5/
+    minApi/url; arquivo servido pelo mount estatico
+  - app com deps: validacao de nome/range, existencia no repo, soma da dep
+    no teto de .js (>48KB exige psram), minApi <= api do app, entry do
+    catalogo leva deps
+  - anti-downgrade por dep (409; force=1), dono por nome, escopo "deps"
+    separado de "apps", delete protegido por consumidor (409 quando nao
+    sobra versao que satisfaca o range do app)
 OTA:
   - publish grava api_version (default = nivel vigente do firmware) e
     firmware_sha256; variant validado e exposto; /api/info traz boards/
@@ -93,6 +103,27 @@ def publish_ota(client, token, channel, meta, firmware: bytes | None = None,
               "force": force})
 
 
+def dep_zip(name: str, version: str, js: bytes, min_api: int = 1,
+            deps: dict | None = None) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("dep.json", json.dumps({
+            "name": name, "version": version, "minApi": min_api,
+            "deps": deps or {}}))
+        zf.writestr(f"{name}.js", js)
+    return buf.getvalue()
+
+
+def publish_dep(client, token, name, version, js=b"exports.ok = 1;\n",
+                min_api=1, deps=None, force=""):
+    return client.post(
+        "/admin/deps",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("dep.zip", dep_zip(name, version, js, min_api, deps),
+                        "application/zip")},
+        data={"force": force})
+
+
 def main() -> None:
     from fastapi.testclient import TestClient
 
@@ -108,6 +139,7 @@ def main() -> None:
             {"name": "dev1", "token": "tok-dev1", "scopes": ["apps"]},
             {"name": "dev2", "token": "tok-dev2", "scopes": ["apps"]},
             {"name": "ci-fw", "token": "tok-ci", "scopes": ["updates"]},
+            {"name": "libdev", "token": "tok-lib", "scopes": ["deps"]},
         ]), encoding="utf-8")
 
         os.environ["CONTENT_DIR"] = str(content)
@@ -300,6 +332,128 @@ def main() -> None:
                            extras={f"m{i:02d}.js": b"1" for i in range(17)}
                            ).status_code == 400,
                    "17 arquivos extras -> 400")
+
+            print("deps: repositorio de dependencias")
+            engine_js = b"// engine\nexports.v = '1.0.0';\n"
+            r = publish_dep(c, "tok-lib", "celeros.engine", "1.0.0",
+                            js=engine_js, min_api=28)
+            expect(r.status_code == 200,
+                   f"publish de dep 200 (veio {r.status_code}: {r.text[:120]})")
+            disk = json.loads((content / "store/deps/celeros.engine/1.0.0"
+                               / "dep.json").read_text())
+            expect(disk.get("publisher") == "libdev" and
+                   disk.get("size") == len(engine_js) and
+                   disk.get("md5") == hashlib.md5(engine_js).hexdigest(),
+                   "dep.json ganha publisher/size/md5 gerenciados")
+            idx = c.get("/store/deps.json").json()
+            expect("deps" in idx and
+                   "celeros.engine" in idx["deps"] and
+                   "1.0.0" in idx["deps"]["celeros.engine"],
+                   "indice /store/deps.json expoe a dep (nao vira categoria)")
+            entry = idx["deps"]["celeros.engine"]["1.0.0"]
+            expect(entry.get("minApi") == 28 and
+                   entry.get("md5") == disk["md5"] and
+                   entry.get("url", "").endswith(
+                       "/store/deps/celeros.engine/1.0.0/celeros.engine.js"),
+                   "entrada do indice traz minApi/md5/url")
+            r = c.get("/store/deps/celeros.engine/1.0.0/celeros.engine.js")
+            expect(r.status_code == 200 and r.content == engine_js,
+                   "arquivo da dep servido pelo mount estatico")
+
+            print("deps: publish de app que declara deps")
+            r = publish(c, "tok-dev1", meta_of("celeros.jogo", "1.0.0", api=30,
+                                               deps={"celeros.engine": "^1.0.0"}))
+            expect(r.status_code == 200,
+                   f"app com dep valida publica (veio {r.status_code}: {r.text[:120]})")
+            entry = c.get("/store/all.json").json()["apps"]["celeros.jogo"]
+            expect(entry.get("deps") == {"celeros.engine": "^1.0.0"},
+                   "entry do catalogo leva deps")
+            expect(publish(c, "tok-dev1", meta_of("celeros.quebrado", api=30,
+                                                  deps={"celeros.fantasma": "^1.0.0"})
+                           ).status_code == 400,
+                   "dep inexistente no repo -> 400")
+            expect(publish(c, "tok-dev1", meta_of("celeros.rng", api=30,
+                                                  deps={"celeros.engine": "1.x"})
+                           ).status_code == 400,
+                   "range malformado -> 400")
+            expect(publish(c, "tok-dev1", meta_of("celeros.apivelho", api=6,
+                                                  deps={"celeros.engine": "^1.0.0"})
+                           ).status_code == 400,
+                   "app com deps e api < 30 -> 400 (require resolve dep na 30)")
+            expect(publish_dep(c, "tok-lib", "celeros.exige99", "1.0.0",
+                               min_api=99).status_code == 200,
+                   "dep com minApi alto publica")
+            expect(publish(c, "tok-dev1", meta_of("celeros.apibaixa", api=30,
+                                                  deps={"celeros.exige99": "^1.0.0"})
+                           ).status_code == 400,
+                   "api do app < minApi da dep -> 400")
+
+            print("deps: soma da dep no teto de .js")
+            fat = b"//" + b"e" * (40 * 1024)
+            expect(publish_dep(c, "tok-lib", "celeros.fat", "1.0.0", js=fat)
+                   .status_code == 200, "dep de 40KB publica")
+            main10 = b"//" + b"m" * (10 * 1024)
+            expect(publish(c, "tok-dev1", meta_of("celeros.apertado", api=30,
+                                                  deps={"celeros.fat": "^1.0.0"}),
+                           main_js=main10).status_code == 400,
+                   "pacote 10KB + dep 40KB sem psram -> 400 (soma > 48KB)")
+            expect(publish(c, "tok-dev1", meta_of("celeros.apertadops", api=30,
+                                                  requires=["psram"],
+                                                  deps={"celeros.fat": "^1.0.0"}),
+                           main_js=main10).status_code == 200,
+                   "mesma soma com requires psram -> 200")
+
+            print("deps: anti-downgrade / dono / escopo")
+            expect(publish_dep(c, "tok-lib", "celeros.engine", "1.0.0",
+                               js=engine_js).status_code == 409,
+                   "republicar mesma versao -> 409")
+            expect(publish_dep(c, "tok-lib", "celeros.engine", "1.0.0",
+                               js=engine_js + b"// fix\n", force="1")
+                   .status_code == 200, "force=1 republica a versao")
+            expect(publish_dep(c, "tok-lib", "celeros.engine", "1.1.0")
+                   .status_code == 200, "versao maior publica")
+            expect(publish_dep(c, "tok-lib", "celeros.engine", "1.0.5")
+                   .status_code == 409, "versao menor que a atual -> 409")
+            expect(publish_dep(c, "tok-dev1", "celeros.engine", "1.2.0")
+                   .status_code == 403, "token sem escopo deps -> 403")
+            expect(publish_dep(c, "tok-lib", "celeros.engine", "1.3.0")
+                   .status_code == 200, "dono publica versao nova")
+
+            print("deps: transitivas")
+            expect(publish_dep(c, "tok-lib", "celeros.bundle", "1.0.0",
+                               deps={"celeros.engine": "^1.0.0"}).status_code
+                   == 200, "dep com transitiva valida publica")
+            expect(publish_dep(c, "tok-lib", "celeros.quebrada", "1.0.0",
+                               deps={"celeros.fantasma": "^1.0.0"}).status_code
+                   == 400, "transitiva inexistente -> 400")
+            expect(publish_dep(c, "tok-lib", "celeros.loop", "1.0.0",
+                               deps={"celeros.loop": "^1.0.0"}).status_code
+                   == 400, "auto-dependencia -> 400")
+
+            print("deps: delete protegido por consumidor")
+            expect(publish(c, "tok-dev1", meta_of("celeros.preso", "1.0.0",
+                                                  api=30,
+                                                  deps={"celeros.engine": "^1.3.0"})
+                           ).status_code == 200,
+                   "app preso no range ^1.3.0 publica")
+            r = c.delete("/admin/deps/celeros.engine/1.3.0",
+                         headers={"Authorization": "Bearer tok-lib"})
+            expect(r.status_code == 409 and "celeros.preso" in r.json()["detail"],
+                   "delete da unica versao que satisfaz o range do app -> 409")
+            r = c.delete("/admin/deps/celeros.engine/1.0.0",
+                         headers={"Authorization": "Bearer tok-lib"})
+            expect(r.status_code == 200,
+                   "delete de versao com alternativa (1.1.0/1.3.0 satisfazem ^1.0.0)")
+            expect(c.delete("/admin/deps/celeros.engine/9.9.9",
+                            headers={"Authorization": "Bearer tok-lib"})
+                   .status_code == 404, "delete de versao inexistente -> 404")
+            expect(c.delete("/admin/deps/celeros.bundle/1.0.0",
+                            headers={"Authorization": "Bearer tok-root"})
+                   .status_code == 200, "root remove dep")
+            info = c.get("/api/info").json()
+            expect(info.get("store", {}).get("dep_packages", 0) >= 2 and
+                   info["store"].get("dep_versions", 0) >= 3,
+                   "/api/info conta pacotes/versoes de deps")
 
             print("OTA: manifest, api_version e variant")
             ota = lambda ver, **kw: {  # noqa: E731

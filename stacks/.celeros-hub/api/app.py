@@ -15,7 +15,8 @@
 #     - root : HUB_ADMIN_TOKEN(_FILE)             -> escopo "*"
 #     - nomeados: HUB_TOKENS_FILE (JSON)          -> [{name, token, scopes}]
 #       escopos: "apps" (publicar/remover apps), "updates" (firmware/OTA),
-#       "*" (ambos). Revogacao/rotacao por token, sem afetar os demais.
+#       "deps" (repositorio de dependencias), "*" (todos). Revogacao/
+#       rotacao por token, sem afetar os demais.
 #   - rate limit de falhas de auth por IP (X-Forwarded-For do Traefik; so o
 #     reverse proxy alcanca o container — nao ha porta publicada no host).
 #   - auditoria em APPEND-ONLY (AUDIT_DIR): ts, ip, agente, acao, alvo, erro.
@@ -26,6 +27,15 @@
 #     trunca em 32 KB), versao <= atual (anti-downgrade; force=1 excecao) e
 #     republicacao/remocao por nao-dono. Downloads de main.js sao contados
 #     em STATS_DIR/downloads.json e expostos em /api/info.
+#   - deps: repositorio de dependencias JS compartilhadas entre apps (a game
+#     engine/fisica, ~53KB que antes eram vendorizados por jogo). App declara
+#     "deps" {nome: "^x.y.z"} no app.json; o publish valida nome/range/existe
+#     versao que satisfaca, soma o .js das deps resolvidas no teto de compile
+#     (o device compila a dep no heap de cada app) e exige api do app >=
+#     minApi da dep. Publicacao em /admin/deps (zip <nome>.js + dep.json),
+#     indice em /store/deps.json, arquivo servido pelo mount estatico
+#     /store/deps/<nome>/<versao>/; a loja do device grava o cache em
+#     /local/modules/<nome>/<versao>/ e o require resolve de la (API 29).
 #   - OTA: rejeita versao MENOR que a atual do canal (anti-rollback; force=1
 #     para excecao) e grava firmware_sha256 no manifest. api_version e
 #     validado (1..999; default = FIRMWARE_API_LEVEL — o device recusa
@@ -53,14 +63,16 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.7.0"
+HUB_VERSION = "0.8.0"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
 # que exigem API maior parariam de rodar — entao o default do publish e o
 # nivel vigente (o antigo default 2 publicava manifest que todo device
-# atual recusava). 27 = matilha (CelerNet.* 26, Pack.* 27, playMusic 25).
-FIRMWARE_API_LEVEL = 27
+# atual recusava). 27 = matilha (CelerNet.* 26, Pack.* 27, playMusic 25);
+# 28 = canvas nativo (setNativeCanvas/pushSprite); 29 = pool de sprites;
+# 30 = dependencias compartilhadas (require fora da pasta do app).
+FIRMWARE_API_LEVEL = 30
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
@@ -127,6 +139,13 @@ STARTED_AT = time.time()
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PKG_NAME = re.compile(r"^[a-z0-9]+(\.[a-z0-9]+)+$")  # ex.: celeros.demo
+# Dependencias compartilhadas: mesmo formato de packageName, segmentos com
+# hifen (a identidade publica do modulo: nome do require, pasta no cache do
+# device e chave no repositorio).
+DEP_NAME = re.compile(r"^[a-z0-9]+(\.[a-z0-9-]+)+$")  # ex.: celeros.engine
+DEP_RANGE = re.compile(r"^\^?\d+\.\d+\.\d+$")  # "^1.2.0" (major) ou exata
+MAX_DEP_JS = 128 * 1024     # teto por modulo de dep (engine ~36KB)
+MAX_APP_DEPS = 8            # deps por app (espelha o mapa do firmware)
 CHANNEL = re.compile(r"^[a-z0-9_.-]+$")
 VARIANT = re.compile(r"^[a-z0-9][a-z0-9.-]{0,31}$")  # ex.: smartdisplay-y8
 SLUG = re.compile(r"^[a-z0-9_-]+$")
@@ -135,6 +154,16 @@ PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 def _semver_tuple(v: str) -> tuple:
     return tuple(int(p) for p in v.split("."))
+
+
+def _range_satisfies(rng: str, version: str) -> bool:
+    """'^x.y.z' = mesma major, >= base; sem '^' = versao exata."""
+    if not DEP_RANGE.match(rng) or not SEMVER.match(version):
+        return False
+    if not rng.startswith("^"):
+        return rng == version
+    b, v = _semver_tuple(rng[1:]), _semver_tuple(version)
+    return v[0] == b[0] and v >= b
 
 DOCS_ON = os.environ.get("HUB_DOCS", "") == "1"
 app = FastAPI(title="CelerOS Hub", version=HUB_VERSION,
@@ -155,7 +184,7 @@ async def harden_headers(request: Request, call_next):
 # autenticacao: root (env/secret) + tokens nomeados com escopo
 # --------------------------------------------------------------------------- #
 
-VALID_SCOPES = {"apps", "updates", "*"}
+VALID_SCOPES = {"apps", "updates", "deps", "*"}
 
 
 def _root_token() -> str:
@@ -363,6 +392,62 @@ def scan_apps() -> dict[str, dict]:
     return out
 
 
+def scan_deps() -> dict[str, dict[str, dict]]:
+    """nome -> {versao: dep.json} de cada dep em store/deps/<nome>/<v>/.
+    O disco e a fonte da verdade (mesmo modelo do scan de apps); a pasta da
+    versao carrega <nome>.js + dep.json."""
+    out: dict[str, dict[str, dict]] = {}
+    root = CONTENT_DIR / "store" / "deps"
+    if not root.is_dir():
+        return out
+    for name_dir in sorted(root.iterdir()):
+        if not name_dir.is_dir():
+            continue
+        for ver_dir in sorted(name_dir.iterdir()):
+            meta = read_json(ver_dir / "dep.json") if ver_dir.is_dir() else None
+            if not meta or meta.get("name") != name_dir.name:
+                continue
+            if not (ver_dir / f"{name_dir.name}.js").exists():
+                continue  # versao incompleta nao entra no indice
+            out.setdefault(name_dir.name, {})[ver_dir.name] = meta
+    return out
+
+
+def _pick_dep(name: str, ranges: list[str], index: dict) -> str:
+    """Maior versao do nome que satisfaca TODOS os ranges coletados."""
+    versions = index.get(name) or {}
+    ok = [v for v in versions
+          if all(_range_satisfies(r, v) for r in ranges)]
+    if not ok:
+        raise HTTPException(400, f"dep '{name}' sem versao que satisfaca "
+                                 f"{' / '.join(ranges)} no repositorio")
+    return max(ok, key=_semver_tuple)
+
+
+def _resolve_app_deps(app_deps: dict) -> dict[str, str]:
+    """Resolve o grafo de deps (diretas + transitivas) -> {nome: versao}.
+
+    BFS pelos ranges; um nome pode chegar por varios caminhos com ranges
+    diferentes — a versao final satisfaz todos eles. Limitacao aceita (as
+    deps oficiais nao tem transitivas): transitivas sao coletadas pela
+    versao escolhida NA PRIMEIRA visita; se um range posterior muda o pick,
+    as transitivas da nova versao nao sao re-coletadas."""
+    index = scan_deps()
+    wanted: dict[str, list[str]] = {}
+    seen: set[tuple[str, str]] = set()
+    queue: list[tuple[str, str]] = list(app_deps.items())
+    while queue:
+        name, rng = queue.pop(0)
+        if (name, rng) in seen:
+            continue  # mesmo par por outro caminho (e guard de ciclo)
+        seen.add((name, rng))
+        wanted.setdefault(name, []).append(rng)
+        pick = _pick_dep(name, wanted[name], index)
+        for d, r in (index[name][pick].get("deps") or {}).items():
+            queue.append((str(d), str(r)))
+    return {n: _pick_dep(n, rs, index) for n, rs in wanted.items()}
+
+
 def catalog_categories() -> dict[str, dict]:
     """slug -> {name, apps: {pkg: entrada compativel com o cliente JS}}.
 
@@ -408,6 +493,11 @@ def catalog_categories() -> dict[str, dict]:
         # verifica cada um; clientes antigos ignoram o campo.
         if meta.get("files"):
             entry["files"] = meta["files"]
+        # Dependencias JS compartilhadas {nome: range}: a loja resolve contra
+        # /store/deps.json no install, baixa para /local/modules e grava o
+        # deps.json resolvido na pasta do app; clientes antigos ignoram.
+        if meta.get("deps"):
+            entry["deps"] = meta["deps"]
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
         cats.setdefault(slug, {"name": cat, "apps": {}})
@@ -437,6 +527,31 @@ def store_all():
     apps = {k: v for c in catalog_categories().values()
             for k, v in c["apps"].items()}
     return {"category": "Todos", "updated": catalog_updated(), "apps": apps}
+
+
+def _deps_updated() -> str:
+    root = CONTENT_DIR / "store" / "deps"
+    mt = [f.stat().st_mtime for f in root.rglob("*") if f.is_file()] \
+        if root.is_dir() else []
+    t = max(mt) if mt else time.time()
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+
+
+@app.get("/store/deps.json")
+def store_deps():
+    """Indice do repositorio de deps: {nome: {versao: {size, md5, minApi,
+    deps, url}}}. A loja do device resolve os ranges do app.json contra
+    este indice e baixa cada arquivo de url (servido pelo mount estatico).
+    Declarada ANTES de /store/{slug}.json para nao virar categoria."""
+    out: dict[str, dict] = {}
+    for name, versions in scan_deps().items():
+        out[name] = {v: {"size": int(m.get("size") or 0),
+                         "md5": str(m.get("md5") or ""),
+                         "minApi": int(m.get("minApi") or 1),
+                         "deps": m.get("deps") or {},
+                         "url": f"{BASE_URL}/store/deps/{name}/{v}/{name}.js"}
+                     for v, m in versions.items()}
+    return {"updated": _deps_updated(), "deps": out}
 
 
 @app.get("/store/{slug}.json")
@@ -475,6 +590,7 @@ def health():
 @app.get("/api/info")
 def info():
     apps = scan_apps()
+    deps = scan_deps()
     updates = {}
     upd_root = CONTENT_DIR / "updates"
     if upd_root.is_dir():
@@ -502,6 +618,8 @@ def info():
             "apps": len(apps),
             "categories": sorted({
                 str(m.get("category") or "Apps") for m in apps.values()}),
+            "dep_packages": len(deps),
+            "dep_versions": sum(len(v) for v in deps.values()),
         },
         "downloads": dict(sorted(stats.items())),
         "downloads_total": sum(stats.values()),
@@ -530,6 +648,20 @@ def _validate_meta(meta: dict) -> dict:
     if not isinstance(requires, list) or any(r not in VALID_REQUIRES for r in requires):
         raise HTTPException(400, "requires invalido "
                                  f"(valores: {', '.join(VALID_REQUIRES)})")
+    deps = meta.get("deps")
+    if deps is not None:
+        if not isinstance(deps, dict):
+            raise HTTPException(400, "deps deve ser objeto "
+                                     '{nome: "^x.y.z"} (ex.: celeros.engine)')
+        if len(deps) > MAX_APP_DEPS:
+            raise HTTPException(400, f"deps: max {MAX_APP_DEPS} entradas")
+        for d, r in deps.items():
+            if not DEP_NAME.match(str(d)):
+                raise HTTPException(400, f"dep com nome invalido: {d} "
+                                         "(use o formato celeros.algo)")
+            if not DEP_RANGE.match(str(r)):
+                raise HTTPException(400, f"dep {d}: versao deve ser "
+                                         '"^1.0.0" ou exata "1.0.0"')
     meta.setdefault("category", "Apps")
     return pkg
 
@@ -616,6 +748,25 @@ async def publish_app(request: Request,
         raise HTTPException(413, f"assets somam {assets_total} bytes "
                                  f"(max {MAX_ASSETS_TOTAL})")
     psram_decl = "psram" in (meta.get("requires") or [])
+    # Dependencias compartilhadas entram NA MESMA soma do teto: o
+    # compartilhado e o armazenamento/flash, mas o device ainda compila a
+    # dep no heap de cada app que a requer. Cada dep resolvida tambem
+    # exige api do app >= minApi dela (device com api menor que a dep nao
+    # pode rodar o app que a declara).
+    if meta.get("deps"):
+        if meta["api"] < 30:
+            raise HTTPException(400, "deps exige api >= 30 no app.json "
+                                     "(o require so resolve dependencia na "
+                                     "API 30)")
+        resolved = _resolve_app_deps(meta["deps"])
+        dep_index = scan_deps()
+        for dname, dver in resolved.items():
+            dmeta = dep_index.get(dname, {}).get(dver) or {}
+            js_sum += int(dmeta.get("size") or 0)
+            dmin = int(dmeta.get("minApi") or 1)
+            if meta["api"] < dmin:
+                raise HTTPException(400, f"dep {dname}@{dver} exige api >= "
+                                         f"{dmin} (app declara {meta['api']})")
     if js_sum > MAX_MAIN_JS_PSRAM:
         raise HTTPException(413, f"soma dos .js ({js_sum} bytes) acima do teto "
                                  f"absoluto ({MAX_MAIN_JS_PSRAM})")
@@ -707,6 +858,179 @@ def delete_app(pkg: str, request: Request,
     shutil.rmtree(dest)
     audit(request, agent, "app:remover", pkg)
     return {"ok": True, "removed": pkg, "store": {"apps": len(scan_apps())}}
+
+
+# --------------------------------------------------------------------------- #
+# admin: repositorio de dependencias JS (escopo "deps")
+#
+# Dep = modulo compartilhado entre apps (engine/fisica): identidade com
+# ponto (celeros.engine), uma versao semver por pasta, arquivo unico
+# <nome>.js + dep.json {name, version, minApi, deps?} no zip. O hub grava
+# em store/deps/<nome>/<versao>/ com campos gerenciados (size/md5/
+# published_at/publisher) e o indice /store/deps.json e gerado na rota.
+# Dono por NOME (publisher da maior versao); anti-downgrade por versao com
+# force=1 para republicar/remediar.
+# --------------------------------------------------------------------------- #
+
+def _dep_owner(name: str) -> str:
+    """Publisher da maior versao existente do nome (dono do namespace)."""
+    versions = scan_deps().get(name) or {}
+    if not versions:
+        return ""
+    top = max(versions, key=_semver_tuple)
+    return str(versions[top].get("publisher") or "")
+
+
+@app.post("/admin/deps")
+async def publish_dep(request: Request,
+                      file: UploadFile = File(...),
+                      force: str = Form(""),
+                      agent: Agent = Depends(require_scope("deps"))):
+    if _body_too_big(request):
+        raise HTTPException(413, "upload grande demais")
+    data = await file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "pacote grande demais")
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "zip invalido")
+    if sum(i.file_size for i in zf.infolist()) > MAX_UNPACKED:
+        raise HTTPException(413, "conteudo descomprimido grande demais")
+    flat: dict[str, bytes] = {}
+    for n in zf.namelist():
+        if n.endswith("/"):
+            continue
+        base = Path(n).name
+        if not FILE_NAME.match(base):
+            raise HTTPException(400, f"nome de arquivo invalido: {base}")
+        if base in flat:
+            raise HTTPException(400, f"arquivo duplicado: {base}")
+        flat[base] = zf.read(n)
+    if len(flat) != 2 or "dep.json" not in flat or \
+            sum(1 for k in flat if k.endswith(".js")) != 1:
+        raise HTTPException(400, "zip da dep deve conter apenas <nome>.js "
+                                 "e dep.json")
+    try:
+        meta = json.loads(flat["dep.json"].decode("utf-8"))
+    except (KeyError, UnicodeDecodeError, ValueError):
+        raise HTTPException(400, "dep.json invalido")
+    if not isinstance(meta, dict):
+        raise HTTPException(400, "dep.json invalido")
+    name = str(meta.get("name") or "")
+    version = str(meta.get("version") or "")
+    if not DEP_NAME.match(name):
+        raise HTTPException(400, "name invalido (formato celeros.algo)")
+    if not SEMVER.match(version):
+        raise HTTPException(400, "version deve ser semver x.y.z")
+    js = flat.get(f"{name}.js")
+    if js is None:
+        raise HTTPException(400, f"zip sem {name}.js")
+    if not js.strip():
+        raise HTTPException(400, "modulo vazio")
+    if len(js) > MAX_DEP_JS:
+        raise HTTPException(413, f"{name}.js: {len(js)} bytes "
+                                 f"(max {MAX_DEP_JS})")
+    try:
+        min_api = int(meta.get("minApi") or 1)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "minApi deve ser inteiro")
+    if not 1 <= min_api <= 999:
+        raise HTTPException(400, "minApi deve ser 1..999")
+    sub = meta.get("deps") or {}
+    if not isinstance(sub, dict) or len(sub) > MAX_APP_DEPS:
+        raise HTTPException(400, f"deps deve ser objeto com ate "
+                                 f"{MAX_APP_DEPS} entradas")
+    for d, r in sub.items():
+        if str(d) == name:
+            raise HTTPException(400, "dep nao pode depender de si mesma")
+        if not DEP_NAME.match(str(d)) or not DEP_RANGE.match(str(r)):
+            raise HTTPException(400, f"dep transitiva invalida: {d}")
+    meta["deps"] = sub
+
+    owner = _dep_owner(name)
+    if owner and owner != agent.name and "*" not in agent.scopes:
+        audit(request, agent, "dep:publicar", name, ok=False,
+              err=f"pertence a {owner}")
+        raise HTTPException(403, f"dep pertence a '{owner}'")
+    existing = scan_deps().get(name) or {}
+    if existing:
+        top = max(existing, key=_semver_tuple)
+        if _semver_tuple(version) <= _semver_tuple(top) and force != "1":
+            raise HTTPException(409, f"versao {version} <= atual {top} "
+                                     f"(force=1 p/ republicar)")
+    if sub:
+        try:
+            _resolve_app_deps(sub)
+        except HTTPException as e:
+            raise HTTPException(400, f"deps transitivas nao resolvem: "
+                                     f"{e.detail}")
+
+    dest = CONTENT_DIR / "store" / "deps" / name / version
+    staging = dest.parent / ".tmp"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    meta["size"] = len(js)
+    meta["md5"] = hashlib.md5(js).hexdigest()
+    meta["published_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    meta["publisher"] = agent.name
+    (staging / f"{name}.js").write_bytes(js)
+    (staging / "dep.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if dest.exists():
+        shutil.rmtree(dest)  # republicacao (force=1)
+    staging.rename(dest)
+    audit(request, agent, "dep:publicar", f"{name}@{version}")
+    return {"ok": True, "dep": name, "version": version,
+            "md5": meta["md5"], "size": meta["size"],
+            "url": f"{BASE_URL}/store/deps/{name}/{version}/{name}.js"}
+
+
+@app.delete("/admin/deps/{name}/{version}")
+def delete_dep(name: str, version: str, request: Request,
+               agent: Agent = Depends(require_scope("deps"))):
+    if not DEP_NAME.match(name) or not SEMVER.match(version):
+        raise HTTPException(400, "dep/versao invalida")
+    dest = CONTENT_DIR / "store" / "deps" / name / version
+    if not dest.is_dir():
+        raise HTTPException(404, "versao nao encontrada")
+    owner = _dep_owner(name)
+    if owner and owner != agent.name and "*" not in agent.scopes:
+        audit(request, agent, "dep:remover", f"{name}@{version}", ok=False,
+              err=f"pertence a {owner}")
+        raise HTTPException(403, f"dep pertence a '{owner}'")
+    # Consumidor sem alternativa: remover a unica versao que satisfaz o
+    # range de um app (ou de uma dep transitiva) quebraria o install dele.
+    dep_index = scan_deps()
+    versions_left = [v for v in (dep_index.get(name) or {}) if v != version]
+
+    def _orphaned_range(wanted: dict) -> str:
+        for d, r in wanted.items():
+            if d != name:
+                continue
+            if not any(_range_satisfies(str(r), v) for v in versions_left):
+                return str(r)
+        return ""
+
+    for pkg, meta in scan_apps().items():
+        rng = _orphaned_range(meta.get("deps") or {})
+        if rng:
+            audit(request, agent, "dep:remover", f"{name}@{version}",
+                  ok=False, err=f"app {pkg} depende")
+            raise HTTPException(409, f"app {pkg} depende de {name} '{rng}' "
+                                     f"e nao sobra versao que satisfaca")
+    for dname, versions in dep_index.items():
+        for v, dmeta in versions.items():
+            if dname == name and v == version:
+                continue
+            rng = _orphaned_range(dmeta.get("deps") or {})
+            if rng:
+                raise HTTPException(409, f"dep {dname}@{v} depende de {name} "
+                                         f"'{rng}' sem alternativa")
+    shutil.rmtree(dest)
+    audit(request, agent, "dep:remover", f"{name}@{version}")
+    return {"ok": True, "removed": f"{name}@{version}"}
 
 
 # --------------------------------------------------------------------------- #
