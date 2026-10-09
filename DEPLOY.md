@@ -190,7 +190,7 @@ HUB_ADMIN_TOKEN=devtoken HUB_DOCS=1 \
 Ajuda e OTA usam URLs absolutas de produção nos arquivos de conteúdo — para
 testar local, mapeie `os.celer.tec.br` para `127.0.0.1` no `/etc/hosts` ou
 aponte o `BASE_URL` de teste. Antes de qualquer deploy de código:
-`python3 tools/test_api.py` (67 checks offline, sem rede e sem secrets).
+`python3 tools/test_api.py` (110 checks offline, sem rede e sem secrets).
 
 ---
 
@@ -205,7 +205,9 @@ aponte o `BASE_URL` de teste. Antes de qualquer deploy de código:
 | Portal 404 / wiki não aparece | rodou o `denv sync apply`? arquivo está em `content/www/…`? |
 | `/admin` devolve 503 | nenhum secret de token montado — esperado até configurar |
 | App publicado "sumiu" após sync | não some: sync não deleta runtime; pacote sem `app.json`+`main.js` é pulado do catálogo |
-| Downloads zeraram após redeploy | contador vive em `/data/stats` na camada do container — conhecido, sem volume dedicado ainda |
+| Downloads zeraram após redeploy | resolvido no hub 0.9.0: `STATS_DIR=/data/audit/stats` (volume NFS da auditoria). Se voltar a zerar, confira o env do compose |
+| Publish recusado `409 nome ... ja e de <pkg>` | outro pacote já usa o mesmo nome de exibição (a loja do device mostraria o errado). Renomeie, remova o antigo (`celerhub delete`) ou `force=1` consciente |
+| Publish recusado `400 api N fora de 1..M` | o app declara API acima do `FIRMWARE_API_LEVEL` do hub: suba o nível no `app.py` junto com o firmware (ciclo de código, seção 3) |
 
 ---
 

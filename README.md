@@ -109,8 +109,10 @@ python3 tools/publish_firmware.py smartdisplay-y build-y/CelerOS.bin \
 ```
 
 O `--api-version` do firmware tem default no hub (o nível atual, `FIRMWARE_API_LEVEL`
-em `api/app.py` — hoje 22, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
-dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele.
+em `api/app.py` — hoje 32, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
+dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele. O
+mesmo nível é o **teto** do publish de apps: `api` acima dele nenhum firmware
+roda (400). Ao subir a API no firmware, suba aqui junto (hub novo + deploy).
 
 Catálogo semente vindo do upstream (KryonOS-AppStore), uma vez:
 
@@ -170,6 +172,16 @@ um token — útil no CI.
 - **Uploads**: teto por request e do total descomprimido do zip (anti
   zip-bomb), whitelist de arquivos do pacote, checagem de magic bytes do PNG,
   validação de `packageName`/semver/canal (sem path traversal).
+- **Catálogo coerente**: nome de exibição **único** entre pacotes (409 sem
+  `force=1` — o legado `com.kryonos.physicsdrop` escondia o
+  `celeros.physicsdrop` 4.0.1 na loja do device) e `api` limitada ao nível do
+  firmware. Teto da soma dos `.js` (app + deps): 48 KB sem PSRAM, **1 MB** com
+  `requires: ["psram"]`; o `celerhub.py` sobe os `.js` enxutos (sem
+  comentários, como o device compila), então a soma é o custo real.
+- **Downloads**: contados por app e por dep (`/api/info` → `downloads`,
+  `dep_downloads`; a entrada do catálogo traz `downloads`), persistidos em
+  `STATS_DIR` no volume NFS da auditoria (`/data/audit/stats`) — sobrevivem a
+  redeploy.
 - **Superfície**: `/api/docs` (Swagger) desligado em produção
   (`HUB_DOCS=1` em dev); TLS termina no Traefik (entrypoint `websecure`).
 
@@ -211,7 +223,8 @@ um token — útil no CI.
   canais; `/health` e `/api/info` (consumidos pelo denv).
 - Publish de app e firmware via CLI (multipart), DELETE de app/canal, 403 sem
   token, atomicidade do `firmware.bin` (write→rename).
-- `tools/test_api.py`: 67 checks via TestClient (apps, multi-arquivo, limites,
-  downloads, OTA — api_version/variant/anti-rollback).
+- `tools/test_api.py`: 110 checks via TestClient (apps, multi-arquivo, limites,
+  nível de API e nome único, downloads de app e dep, deps, OTA —
+  api_version/variant/anti-rollback).
 - Portal renderizado e conferido no navegador (loja/placas/firmware/CelerOS/
   ajuda/devs).

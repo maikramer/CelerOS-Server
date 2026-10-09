@@ -25,8 +25,10 @@
 #   - apps: publish calcula os campos gerenciados (size, md5, published_at,
 #     publisher) e grava no app.json; rejeita main.js > 30 KB (o device
 #     trunca em 32 KB), versao <= atual (anti-downgrade; force=1 excecao) e
-#     republicacao/remocao por nao-dono. Downloads de main.js sao contados
-#     em STATS_DIR/downloads.json e expostos em /api/info.
+#     republicacao/remocao por nao-dono, api acima de FIRMWARE_API_LEVEL e
+#     NOME de exibicao repetido entre pacotes (force=1 excecao). Downloads
+#     de main.js e das deps sao contados em STATS_DIR/downloads.json (no
+#     volume NFS em producao) e expostos em /api/info.
 #   - deps: repositorio de dependencias JS compartilhadas entre apps (a game
 #     engine/fisica, ~53KB que antes eram vendorizados por jogo). App declara
 #     "deps" {nome: "^x.y.z"} no app.json; o publish valida nome/range/existe
@@ -63,7 +65,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.8.1"
+HUB_VERSION = "0.9.0"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -72,8 +74,11 @@ HUB_VERSION = "0.8.1"
 # atual recusava). 27 = matilha (CelerNet.* 26, Pack.* 27, playMusic 25);
 # 28 = canvas nativo (setNativeCanvas/pushSprite); 29 = pool de sprites;
 # 30 = dependencias compartilhadas (require fora da pasta do app);
-# 31 = verlet nativo (System.verlet*, JsPhysics.cpp).
-FIRMWARE_API_LEVEL = 31
+# 31 = verlet nativo (System.verlet*, JsPhysics.cpp);
+# 32 = System.sfx (efeito misturado na trilha, nao bloqueia), caixas sujas
+# multiplas no present e textWidth em pixels fisicos no canvas nativo.
+# Tambem e o TETO do publish de apps: api acima disto nenhum firmware roda.
+FIRMWARE_API_LEVEL = 32
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
@@ -115,8 +120,13 @@ MAX_MAIN_JS = 48 * 1024   # download e streaming (Net.download), sem teto de 32K
 # Teto em 2 niveis (mesma regra do celerhub.py): acima de MAX_MAIN_JS o app
 # precisa declarar "psram" em requires — sem PSRAM a RAM interna nao fecha o
 # compile (medido na CYD: 61KB roda, 82KB nao compila). Com a declaracao o
-# teto absoluto e MAX_MAIN_JS_PSRAM (placas S3 com PSRAM nao tem limite).
-MAX_MAIN_JS_PSRAM = 128 * 1024
+# teto absoluto e MAX_MAIN_JS_PSRAM: as placas S3 com PSRAM compilam o fonte
+# num bloco so de PSRAM (~6-7MB contiguos livres no launch), entao 1MB (1/8
+# da PSRAM) cabe com folga — o preco e a abertura (compile linear) e espaco
+# na littlefs. Era 128KB e recusava o Detona 0.6.0 (duelo pela malha) com o
+# cliente ja em 1MB. O celerhub.py sobe os .js ENXUTOS (sem comentarios,
+# como o device compila): a soma medida aqui e o custo real.
+MAX_MAIN_JS_PSRAM = 1024 * 1024
 VALID_REQUIRES = ("psram",)
 MAX_ICON = 16 * 1024      # PNG 64x64 nao passa de poucos KB; teto folgado
 # Acima disso o app PRECISA declarar api >= 6: firmwares antigos instalavam
@@ -501,6 +511,9 @@ def catalog_categories() -> dict[str, dict]:
             entry["deps"] = meta["deps"]
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
+        n_down = _load_stats().get(pkg, 0)
+        if n_down:
+            entry["downloads"] = n_down  # portal ordena/mostra; o device ignora
         cats.setdefault(slug, {"name": cat, "apps": {}})
         cats[slug]["apps"][pkg] = entry
     return cats
@@ -565,6 +578,20 @@ def store_category(slug: str):
     return {"category": cat["name"], "apps": cat["apps"]}
 
 
+@app.get("/store/deps/{name}/{version}/{fname}")
+def download_dep_js(name: str, version: str, fname: str):
+    """Download de dep com contagem ("dep:<nome>" no mesmo contador) — rota
+    na frente do mount /store, mesmo path e cache-control."""
+    if not DEP_NAME.match(name) or not SEMVER.match(version) or fname != f"{name}.js":
+        raise HTTPException(404, "dependencia nao encontrada")
+    f = CONTENT_DIR / "store" / "deps" / name / version / fname
+    if not f.is_file():
+        raise HTTPException(404, "dependencia nao encontrada")
+    _count_download(f"dep:{name}")
+    return FileResponse(f, media_type="text/javascript",
+                        headers={"cache-control": "no-cache"})
+
+
 @app.get("/store/apps/{pkg}/main.js")
 def download_app_js(pkg: str):
     """Download do codigo do app com contagem (rota na frente do mount
@@ -622,8 +649,9 @@ def info():
             "dep_packages": len(deps),
             "dep_versions": sum(len(v) for v in deps.values()),
         },
-        "downloads": dict(sorted(stats.items())),
-        "downloads_total": sum(stats.values()),
+        "downloads": {k: v for k, v in sorted(stats.items()) if not k.startswith("dep:")},
+        "downloads_total": sum(v for k, v in stats.items() if not k.startswith("dep:")),
+        "dep_downloads": {k[4:]: v for k, v in sorted(stats.items()) if k.startswith("dep:")},
         "updates": updates,
     }
 
@@ -645,6 +673,11 @@ def _validate_meta(meta: dict) -> dict:
         meta["api"] = int(meta.get("api") or 1)
     except (TypeError, ValueError):
         raise HTTPException(400, "api deve ser inteiro")
+    if not 1 <= meta["api"] <= FIRMWARE_API_LEVEL:
+        # nenhum firmware publicado roda o app: ele ficaria no catalogo como
+        # "Requer API N" para sempre (ou ate o hub subir o nivel junto)
+        raise HTTPException(400, f"api {meta['api']} fora de 1..{FIRMWARE_API_LEVEL} "
+                                 f"(nivel do firmware atual)")
     requires = meta.get("requires") or []
     if not isinstance(requires, list) or any(r not in VALID_REQUIRES for r in requires):
         raise HTTPException(400, "requires invalido "
@@ -785,6 +818,16 @@ async def publish_app(request: Request,
             raise HTTPException(400, "icon.png nao e um PNG")
         if len(files["icon.png"]) > MAX_ICON:
             raise HTTPException(413, f"icon.png grande demais (max {MAX_ICON})")
+
+    # nome de exibicao UNICO no catalogo: dois pacotes com o mesmo nome (o
+    # legado com.kryonos.physicsdrop 1.0.0 x celeros.physicsdrop 4.0.1)
+    # deixavam a loja mostrar o velho no lugar do novo. force=1 aceita.
+    nome = str(meta.get("name") or "").strip().casefold()
+    if force != "1":
+        for opkg, ometa in scan_apps().items():
+            if opkg != pkg and str(ometa.get("name") or "").strip().casefold() == nome:
+                raise HTTPException(409, f"nome '{meta.get('name')}' ja e de {opkg} "
+                                         f"(renomeie ou force=1)")
 
     # dono e anti-downgrade: o publish de atualizacao respeita quem publicou
     # primeiro e nunca retrocede versao (force=1 exceta ambos; raiz "*" sempre

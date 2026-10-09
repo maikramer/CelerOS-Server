@@ -194,6 +194,10 @@ def main() -> None:
                    .get("celeros.testapp") == 2, "/api/info conta 2 downloads")
             expect(c.get("/store/apps/celeros.naoexiste/main.js").status_code
                    == 404, "download de pacote inexistente 404")
+            entry2 = c.get("/store/all.json").json()["apps"]["celeros.testapp"]
+            expect(entry2.get("downloads") == 2, "entry do catalogo traz downloads")
+            expect((Path(os.environ["STATS_DIR"]) / "downloads.json").is_file(),
+                   "contador persistido em STATS_DIR")
 
             print("anti-downgrade / republicacao")
             expect(publish(c, "tok-dev1",
@@ -231,6 +235,7 @@ def main() -> None:
             big31 = b"//" + b"x" * (31 * 1024)
             big49 = b"//" + b"x" * (49 * 1024)
             big129 = b"//" + b"x" * (129 * 1024)
+            big1025 = b"//" + b"x" * (1025 * 1024)
             expect(publish(c, "tok-dev1", meta_of("celeros.big31"),
                            main_js=big31).status_code == 400,
                    "main.js > 30 KB com api < 6 -> 400")
@@ -250,8 +255,35 @@ def main() -> None:
             expect(publish(c, "tok-dev1", meta_of("celeros.big129", "1.0.0",
                                                   api=6,
                                                   requires=["psram"]),
-                           main_js=big129).status_code == 413,
-                   "main.js > 128 KB absoluto -> 413")
+                           main_js=big129).status_code == 200,
+                   "main.js de 129 KB com psram -> 200 (teto subiu para 1 MB)")
+            expect(publish(c, "tok-dev1", meta_of("celeros.big1025", "1.0.0",
+                                                  api=6,
+                                                  requires=["psram"]),
+                           main_js=big1025).status_code == 413,
+                   "main.js > 1 MB absoluto -> 413")
+
+            print("nivel de API e nome unico (0.9.0)")
+            expect(publish(c, "tok-dev1", meta_of("celeros.futuro", "1.0.0",
+                                                  api=hubapi.FIRMWARE_API_LEVEL + 1))
+                   .status_code == 400, "api acima do firmware -> 400")
+            expect(publish(c, "tok-dev1", meta_of("celeros.agora", "1.0.0",
+                                                  api=hubapi.FIRMWARE_API_LEVEL))
+                   .status_code == 200, "api = nivel do firmware -> 200")
+            expect(publish(c, "tok-dev1", meta_of("celeros.zero", "1.0.0", api=0))
+                   .status_code in (200, 400), "api 0 vira 1 (default) ou e recusada")
+            m_dup = meta_of("celeros.outroagora", "1.0.0", name="Agora")
+            r = publish(c, "tok-dev1", m_dup)
+            expect(r.status_code == 409 and "celeros.agora" in r.text,
+                   "nome repetido em outro pacote -> 409 dizendo o dono")
+            m_dup2 = meta_of("celeros.outroagora", "1.0.0", name="  agora ")
+            expect(publish(c, "tok-dev1", m_dup2).status_code == 409,
+                   "nome repetido ignora caixa/espacos")
+            expect(publish(c, "tok-dev1", meta_of("celeros.agora", "1.0.1",
+                                                  api=hubapi.FIRMWARE_API_LEVEL))
+                   .status_code == 200, "update do MESMO pacote nao colide consigo")
+            expect(publish(c, "tok-dev1", m_dup, force="1").status_code == 200,
+                   "force=1 aceita nome repetido")
             expect(publish(c, "tok-dev1", meta_of("celeros.iconbig"),
                            icon=PNG + b"0" * 17 * 1024).status_code == 413,
                    "icon.png > 16 KB -> 413")
@@ -359,6 +391,13 @@ def main() -> None:
             r = c.get("/store/deps/celeros.engine/1.0.0/celeros.engine.js")
             expect(r.status_code == 200 and r.content == engine_js,
                    "arquivo da dep servido pelo mount estatico")
+            expect(c.get("/api/info").json().get("dep_downloads", {})
+                   .get("celeros.engine") == 1, "download de dep contado em dep_downloads")
+            expect("dep:celeros.engine" not in c.get("/api/info").json()["downloads"],
+                   "dep nao polui o contador de apps")
+            expect(c.get("/store/deps/celeros.engine/1.0.0/outro.js").status_code == 404 and
+                   c.get("/store/deps/celeros.engine/9.9.9/celeros.engine.js").status_code == 404,
+                   "dep com arquivo/versao errados -> 404")
 
             print("deps: publish de app que declara deps")
             r = publish(c, "tok-dev1", meta_of("celeros.jogo", "1.0.0", api=30,
