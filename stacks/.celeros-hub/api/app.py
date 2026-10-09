@@ -63,7 +63,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.8.0"
+HUB_VERSION = "0.8.1"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -71,8 +71,9 @@ HUB_VERSION = "0.8.0"
 # nivel vigente (o antigo default 2 publicava manifest que todo device
 # atual recusava). 27 = matilha (CelerNet.* 26, Pack.* 27, playMusic 25);
 # 28 = canvas nativo (setNativeCanvas/pushSprite); 29 = pool de sprites;
-# 30 = dependencias compartilhadas (require fora da pasta do app).
-FIRMWARE_API_LEVEL = 30
+# 30 = dependencias compartilhadas (require fora da pasta do app);
+# 31 = verlet nativo (System.verlet*, JsPhysics.cpp).
+FIRMWARE_API_LEVEL = 31
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
