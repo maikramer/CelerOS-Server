@@ -114,11 +114,14 @@ dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele. O
 mesmo nível é o **teto** do publish de apps: `api` acima dele nenhum firmware
 roda (400). Ao subir a API no firmware, suba aqui junto (hub novo + deploy).
 
-Catálogo semente vindo do upstream (KryonOS-AppStore), uma vez:
-
-```bash
-python3 tools/import_kryonos_catalog.py   # --dry-run para inspecionar
-```
+**Loja e canais OTA não moram no repo.** `store/apps/`, `store/deps/` e
+`updates/` são estado de RUNTIME, gravado no NFS pela API admin (publish via
+`celerhub.py`/`publish_firmware.py`). O sync do denv é `rsync` sem `--delete`
+e sem exclusão: qualquer arquivo dessas pastas que voltar para `content/`
+**sobrescreve** a versão publicada a cada `denv update`. Foi o que manteve os
+canais OTA presos na 1.1.0 e ressuscitou o catálogo legado `com.kryonos.*`
+até o hub 0.9.0 (2026-10-09) — a semente (KryonOS-AppStore + `update.json`
+1.1.0) e o `import_kryonos_catalog.py` saíram do repo.
 
 Assets de marca (se as artes em `branding/` mudarem):
 

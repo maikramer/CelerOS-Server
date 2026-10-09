@@ -92,6 +92,11 @@ Notas importantes:
   admin em runtime (gravados no NFS pelo volume rw) sobrevivem ao sync. O
   contrário também vale — remover do repo não remove da loja; para isso use
   `DELETE /admin/apps/<pkg>`.
+- **Nunca coloque nada em `content/store/apps`, `content/store/deps` ou
+  `content/updates`.** São estado de runtime da API. O rsync não tem exclusão:
+  arquivo dessas pastas no repo SOBRESCREVE o publicado a cada `denv update`
+  (até 2026-10-09 a semente velha rebobinava 6 apps, ressuscitava 19 legados e
+  devolvia os canais OTA para a 1.1.0 em todo deploy).
 - **Mudou CSS/JS do portal ou da wiki?** O Cloudflare cacheia assets estáticos
   (`.css`/`.js`/`.webmanifest`) — o mount não manda `no-cache` para eles.
   Convenção: **cache-bust** — bump na query da URL no HTML que referencia
