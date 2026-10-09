@@ -1,9 +1,0 @@
-{
-  "version": "1.1.0",
-  "api_version": 22,
-  "major_update": false,
-  "minor_update": false,
-  "security_update": false,
-  "changelog": "CelerOS Hub no ar (os.celer.tec.br). Canal de updates migrado do GitHub para o hub proprio; loja de apps e ajuda online tambem. Nenhuma versao nova de firmware ainda — publicacao via tools/publish_firmware.py.",
-  "guide": "Abra Settings > Atualizacao e toque em CHECK. Enquanto a versao publicada nao for maior que a instalada, nao ha nada a fazer."
-}
