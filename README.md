@@ -69,13 +69,20 @@ DNS (uma vez, no Cloudflare da zona `celer.tec.br`): aponte
 funciona com o Origin Cert existente; sem proxy, entre com um certresolver
 ou Origin Cert próprio do host.
 
-Build + deploy (a TAG é a **versão do hub**, `HUB_VERSION` em `api/app.py` —
-tag nova no registry força build de verdade; subiu a versão? build/deploy com
-a tag nova):
+**Roteiro completo — primeira subida, ciclo de código, verificação pós-deploy
+e troubleshooting: [DEPLOY.md](DEPLOY.md).** O essencial do dia a dia:
 
 ```bash
-denv build --service celeros-hub --tag 0.3.0 --push   # build + push da versão
-denv update celeros-hub -t 0.3.0                      # rolling update
+# conteúdo (wiki/portal/help/apps): sem restart
+denv sync apply celeros-hub -y --no-tui
+
+# código da API: a TAG é a versão do hub (HUB_VERSION em api/app.py).
+# O git-guard exige commit+push — inclusive do MARKER `ARG BASE_TAG` que o
+# próprio build reescreve no dockerfile (a pegadinha clássica do fluxo):
+denv build --service celeros-hub --tag 0.7.0 --push
+git add stacks/.celeros-hub/dockerfile.celeros-hub
+git commit -m "marker de build: ARG BASE_TAG=0.7.0" && git push
+denv update celeros-hub -t 0.7.0
 ```
 
 O sync leva `content/` para `/mnt/nfs/celeros-hub/content` (montado rw — a
