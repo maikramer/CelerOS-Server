@@ -65,7 +65,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.9.0"
+HUB_VERSION = "0.9.1"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -157,7 +157,11 @@ DEP_NAME = re.compile(r"^[a-z0-9]+(\.[a-z0-9-]+)+$")  # ex.: celeros.engine
 DEP_RANGE = re.compile(r"^\^?\d+\.\d+\.\d+$")  # "^1.2.0" (major) ou exata
 MAX_DEP_JS = 128 * 1024     # teto por modulo de dep (engine ~36KB)
 MAX_APP_DEPS = 8            # deps por app (espelha o mapa do firmware)
-CHANNEL = re.compile(r"^[a-z0-9_.-]+$")
+# Canal OTA = BoardProfile::otaChannel do firmware, com MAIUSCULAS
+# ("smartdisplay_4848S040"): o regex so-minusculas recusava o canal do
+# SmartDisplay e o OTA dele nunca pode ser publicado pela API (ficava o
+# update.json da semente, 1.1.0). O path no disco e servido como veio.
+CHANNEL = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 VARIANT = re.compile(r"^[a-z0-9][a-z0-9.-]{0,31}$")  # ex.: smartdisplay-y8
 SLUG = re.compile(r"^[a-z0-9_-]+$")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"

@@ -512,6 +512,14 @@ def main() -> None:
                    "update.json gravado com api_version/sha256")
             expect((content / "updates/esp32/firmware.bin").read_bytes()
                    == blob, "firmware.bin gravado integro")
+            r = publish_ota(c, "tok-ci", "smartdisplay_4848S040", ota("1.8.2"), firmware=blob)
+            expect(r.status_code == 200 and
+                   (content / "updates/smartdisplay_4848S040/firmware.bin").is_file(),
+                   "canal com maiusculas (smartdisplay_4848S040) publica")
+            expect(c.get("/updates/smartdisplay_4848S040/update.json").json()
+                   .get("version") == "1.8.2", "manifest servido no path do canal")
+            expect(publish_ota(c, "tok-ci", "../x", ota("1.0.0")).status_code in (400, 404, 405),
+                   "canal com path traversal recusado")
             r = publish_ota(c, "tok-ci", "esp32", ota("1.1.0"))
             expect(r.status_code == 409, "rollback OTA (versao menor) -> 409")
             r = publish_ota(c, "tok-ci", "esp32", ota("1.1.0"), force="1")
