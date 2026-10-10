@@ -212,6 +212,8 @@ aponte o `BASE_URL` de teste. Antes de qualquer deploy de código:
 | App publicado "sumiu" após sync | não some: sync não deleta runtime; pacote sem `app.json`+`main.js` é pulado do catálogo |
 | Downloads zeraram após redeploy | resolvido no hub 0.9.0: `STATS_DIR=/data/audit/stats` (volume NFS da auditoria). Se voltar a zerar, confira o env do compose |
 | Publish recusado `409 nome ... ja e de <pkg>` | outro pacote já usa o mesmo nome de exibição (a loja do device mostraria o errado). Renomeie, remova o antigo (`celerhub delete`) ou `force=1` consciente |
+| OTA recusado `400 canal invalido` em canal real | hub < 0.9.1 so aceitava minusculas; o canal do SmartDisplay e `smartdisplay_4848S040`. Confira `/health` >= 0.9.1 |
+| Canal OTA "volta" para uma versao velha apos deploy | arquivo em `content/updates/` no repo sobrescreve o NFS no sync — os canais nao moram no repo (removido no 0.9.0) |
 | Publish recusado `400 api N fora de 1..M` | o app declara API acima do `FIRMWARE_API_LEVEL` do hub: suba o nível no `app.py` junto com o firmware (ciclo de código, seção 3) |
 
 ---
