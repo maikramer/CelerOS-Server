@@ -13,7 +13,7 @@
 # python? Edite o FROM abaixo (fixada de proposito; o denv reescreve o
 # `ARG BASE_TAG` com a tag do deploy, que aqui e so um no-op).
 
-ARG BASE_TAG=0.9.1
+ARG BASE_TAG=0.9.2
 FROM python:3.12.10-alpine
 
 # Dependencias pinadas (fastapi traz starlette/pydantic; multipart p/ upload).
