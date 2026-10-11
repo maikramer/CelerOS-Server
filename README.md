@@ -28,7 +28,8 @@ CelerOS-Server/
 │   ├── www/                      # portal (index.html + assets de marca)
 │   ├── store/apps/<pkg>/         # pacotes: app.json + main.js [+ icon.png]
 │   ├── updates/<canal>/          # esp32 | smartdisplay_4848S040 |
-│   │                             # waveshare_amoled206 | spotpear_zzpet | devkit
+│   │                             # waveshare_amoled206 | spotpear_zzpet |
+│   │                             # esp32-cam | devkit
 │   └── help/                     # index -> categorias -> artigos
 ├── branding/                     # artes originais (fonte da marca)
 └── tools/                        # CLIs de publicação e manutenção
@@ -99,7 +100,7 @@ python3 tools/publish_app.py minha-pasta-do-app --token $CELER_HUB_TOKEN
 
 # firmware OTA — canal da placa:
 #   esp32 (CYD) | smartdisplay_4848S040 | waveshare_amoled206 (watch)
-#   spotpear_zzpet (cão) | devkit (barebone)
+#   spotpear_zzpet (cão) | esp32-cam (nó de câmera) | devkit (barebone)
 python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
   --version 1.5.0 --changelog "- novidade" --token $CELER_HUB_TOKEN
 
@@ -109,7 +110,7 @@ python3 tools/publish_firmware.py smartdisplay-y build-y/CelerOS.bin \
 ```
 
 O `--api-version` do firmware tem default no hub (o nível atual, `FIRMWARE_API_LEVEL`
-em `api/app.py` — hoje 32, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
+em `api/app.py` — hoje 36, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
 dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele. O
 mesmo nível é o **teto** do publish de apps: `api` acima dele nenhum firmware
 roda (400). Ao subir a API no firmware, suba aqui junto (hub novo + deploy).
@@ -140,6 +141,8 @@ autenticam). **Escrita só com token** — `POST/DELETE /admin/*` exigem
 | `*`       | tudo                             | você (root)            |
 | `apps`    | publicar/remover apps da loja    | colaboradores          |
 | `updates` | publicar firmware nos canais OTA | CI / publicador de fw  |
+| `deps`    | publicar/remover deps JS (engine,| mantenedor da engine   |
+|           | física, CelerGame…) do repo      | (celerhub publish-dep) |
 
 Credenciais vivem em **Docker secrets** (nunca em environment/commit):
 
@@ -226,7 +229,7 @@ um token — útil no CI.
   canais; `/health` e `/api/info` (consumidos pelo denv).
 - Publish de app e firmware via CLI (multipart), DELETE de app/canal, 403 sem
   token, atomicidade do `firmware.bin` (write→rename).
-- `tools/test_api.py`: 110 checks via TestClient (apps, multi-arquivo, limites,
+- `tools/test_api.py`: 113 checks via TestClient (apps, multi-arquivo, limites,
   nível de API e nome único, downloads de app e dep, deps, OTA —
   api_version/variant/anti-rollback).
 - Portal renderizado e conferido no navegador (loja/placas/firmware/CelerOS/

@@ -65,7 +65,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.9.2"
+HUB_VERSION = "0.9.3"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -78,8 +78,15 @@ HUB_VERSION = "0.9.2"
 # 32 = System.sfx (efeito misturado na trilha, nao bloqueia), caixas sujas
 # multiplas no present e textWidth em pixels fisicos no canvas nativo.
 # 33 = corpo rigido nativo (System.rigid*, Rigid2D.h) + drawSprite girado.
+# 34 = System.blitSprite (painter da camada suja em 1 chamada) e rigidState
+# com buffer reutilizado (2o arg preenchido no lugar, sem realloc por quadro).
+# 35 = Camera.* (fotos e QR on-device) na esp32-cam + perfil sem vidro
+# (CELEROS_UI): launcher headless, apps no SD.
+# 36 = recursos do bando (Pack.resources/open, listen/speak/record, snap/
+# view/drawFrame, canais de dados): mic, speaker, camera e dados pela
+# malha (DataLink ESP-NOW, quadros de ate 1458 B sem roteador).
 # Tambem e o TETO do publish de apps: api acima disto nenhum firmware roda.
-FIRMWARE_API_LEVEL = 33
+FIRMWARE_API_LEVEL = 36
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
@@ -108,6 +115,13 @@ BOARDS = {
         "name": "Devkit barebone",
         "desc": "ESP32 4MB sem tela (LED + botao BOOT) para apps de"
                 " sensor/atuador",
+    },
+    "esp32-cam": {
+        "name": "ESP32-CAM (no de camera)",
+        "desc": "AI-Thinker ESP32-S headless (API 35): OV2640 com Camera.*"
+                " (fotos e QR), microSD e matilha — o 'vidro' dela e o"
+                " sensor; na API 36 vira a camera do bando"
+                " (Pack.snap/view)",
     },
 }
 BASE_URL = os.environ.get("BASE_URL", "https://os.celer.tec.br").rstrip("/")
@@ -500,7 +514,7 @@ def catalog_categories() -> dict[str, dict]:
             entry["md5"] = str(meta["md5"])
         if meta.get("published_at"):
             entry["published_at"] = str(meta["published_at"])
-        # Requisitos de hardware (requires psram destrava o teto de 128KB no
+        # Requisitos de hardware (requires psram destrava o teto de 1MB no
         # publish): a loja do device le o campo para o badge "Requer PSRAM"
         # e o bloqueio de install em placa sem PSRAM.
         if meta.get("requires"):

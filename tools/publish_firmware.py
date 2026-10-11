@@ -9,7 +9,7 @@ firmware_url relativa ("firmware.bin").
 Canais das placas (main/Boards/<placa>/Board.cpp do CelerOS):
   esp32 (CYD 2.8") | smartdisplay_4848S040 (SmartDisplay 4") |
   waveshare_amoled206 (Watch AMOLED 2.06") | spotpear_zzpet (cao ZZPET) |
-  devkit (barebone sem tela)
+  esp32-cam (AI-Thinker, no de camera headless) | devkit (barebone sem tela)
 Token: --token ou env CELER_HUB_TOKEN.
 
 Uso:
@@ -31,7 +31,7 @@ from pathlib import Path
 from urllib import error, request
 
 CHANNELS = ("esp32", "smartdisplay_4848S040", "waveshare_amoled206",
-            "spotpear_zzpet", "devkit")
+            "spotpear_zzpet", "esp32-cam", "devkit")
 
 
 def die(msg: str) -> None:
