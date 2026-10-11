@@ -131,7 +131,7 @@ while (true) {
     <div class="tblwrap"><table class="tbl">
       <thead><tr><th>Regra</th><th>Limite</th><th>Erro</th></tr></thead>
       <tbody>
-        <tr><td><code>main.js</code> (+ módulos .js)</td><td>≤ 48 KB <span class="pill dim">≤ 128 KB com requires psram</span></td><td>400 / 413</td></tr>
+        <tr><td><code>main.js</code> (+ módulos .js + deps)</td><td>≤ 48 KB <span class="pill dim">≤ 1 MB com requires psram</span></td><td>400 / 413</td></tr>
         <tr><td>qualquer .js individual &gt; 30 KB</td><td>exige <code>api ≥ 6</code> (truncamento em fw antigo)</td><td>400</td></tr>
         <tr><td><code>icon.png</code></td><td>≤ 16 KB + magic bytes PNG</td><td>400 / 413</td></tr>
         <tr><td>extras (multi-arquivo)</td><td>≤ 16 arquivos, ≤ 128 KB cada, ≤ 256 KB somados</td><td>400 / 413</td></tr>

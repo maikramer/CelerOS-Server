@@ -42,9 +42,10 @@
 <main class="page wide">
   <span class="kicker">Use o CelerOS</span>
   <h1 class="doc-title">Placas <strong>suportadas</strong></h1>
-  <p class="lead">Cinco placas, cinco canais OTA no hub. Os apps em JS escrevem contra um
+  <p class="lead">Seis placas, seis canais OTA no hub. Os apps em JS escrevem contra um
   canvas lógico de 240×320 que o firmware escala para o vidro de cada placa — o mesmo
-  <code>main.js</code> roda no monitor de 2,8" e no relógio redondo. As telas abaixo são
+  <code>main.js</code> roda no monitor de 2,8" e no relógio redondo (e há o
+  perfil sem vidro, para placa de sensor). As telas abaixo são
   capturas reais do framebuffer de cada placa, feitas com <code>celerctl screencap</code>.</p>
 
   <article>
@@ -137,6 +138,24 @@
       <li><b>Canal OTA:</b> <code>devkit</code></li>
     </ul>
 
+    <!-- ESP32-CAM -->
+    <h2 id="esp32cam">ESP32-CAM · AI-Thinker (nó de câmera) <a class="hash" href="#esp32cam">#</a></h2>
+    <ul>
+      <li><b>Chip:</b> ESP32-S clássico (dual-core no build), 4 MB flash +
+      <b>4 MB de PSRAM</b> — é ela que segura os frames do sensor e os slots
+      de fotos.</li>
+      <li><b>Perfil:</b> <b>headless</b> (API 35) — sem vidro, o "display" é o
+      sensor <b>OV2640</b>: <code>Camera.setup/capture/save/scanQR</code> com
+      LED de flash, apps no microSD e interface por <code>celerctl</code> na
+      UART0 ou web server. Na API 36 vira a <b>câmera do bando</b>: fotos e
+      vídeo remotos pela matilha (<code>Pack.snap/view</code>) — o par
+      QrNode + Bilheteria é a demo E2E.</li>
+      <li><b>Extras:</b> microSD dedicado em SPI, BLE · matilha CelerNet.
+      Bancada: brownout é a falha nº 1 da ESP32-CAM — alimente 5 V de fonte
+      robusta, não pelo 3V3 do FTDI.</li>
+      <li><b>Canal OTA:</b> <code>esp32-cam</code></li>
+    </ul>
+
     <h2 id="comparativo">Comparativo <a class="hash" href="#comparativo">#</a></h2>
     <div class="tblwrap"><table class="tbl">
       <thead><tr><th>Placa</th><th>Canal OTA</th><th>Chip</th><th>Vidro</th><th>Touch</th><th>PSRAM</th><th>SD</th><th>BLE</th></tr></thead>
@@ -145,6 +164,7 @@
         <tr><td>SmartDisplay 4848S040</td><td><code>smartdisplay_4848S040</code></td><td>ESP32-S3</td><td>480×480 IPS</td><td>capacitivo</td><td class="pill ok">8 MB</td><td>dedicado ✓</td><td class="pill ok">matilha</td></tr>
         <tr><td>Waveshare AMOLED 2.06</td><td><code>waveshare_amoled206</code></td><td>ESP32-S3</td><td>412×502 AMOLED ⬤</td><td>capacitivo</td><td class="pill ok">sim</td><td>—</td><td class="pill ok">matilha</td></tr>
         <tr><td>Spotpear ZZ-PET</td><td><code>spotpear_zzpet</code></td><td>ESP32-S3</td><td>128×64 OLED</td><td>—</td><td class="pill ok">sim</td><td>—</td><td class="pill ok">matilha</td></tr>
+        <tr><td>ESP32-CAM (AI-Thinker)</td><td><code>esp32-cam</code></td><td>ESP32-S</td><td>— (câmera OV2640)</td><td>—</td><td class="pill ok">4 MB</td><td>dedicado ✓</td><td class="pill ok">matilha</td></tr>
         <tr><td>Devkit</td><td><code>devkit</code></td><td>ESP32</td><td>—</td><td>—</td><td>conforme placa</td><td>—</td></tr>
       </tbody>
     </table></div>

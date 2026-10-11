@@ -128,7 +128,7 @@
       <div class="card"><div class="c-ico">⛁</div><h3>Firmware CelerOS</h3>
       <p>ESP32 (IDF) com launcher em immediate-mode sobre LovyanGFX, engine JS
       <b>Duktape</b> (ES5), OTA de slots A/B, WiFi/BLE, IA on-device e voz. Repo
-      <code>CelerOS</code> — <code>CELEROS_API_LEVEL</code> vigente: <b>27</b> (a matilha: <code>CelerNet.*</code> 26, <code>Pack.*</code> 27).</p></div>
+      <code>CelerOS</code> — <code>CELEROS_API_LEVEL</code> vigente: <b>36</b> (33: corpo rígido nativo · 34: <code>blitSprite</code> · 35: <code>Camera.*</code> na ESP32-CAM · 36: recursos do bando pela matilha).</p></div>
       <div class="card"><div class="c-ico">☁</div><h3>Hub (este servidor)</h3>
       <p>Um serviço FastAPI único: catálogo da loja gerado <b>na rota</b> (o disco é a
       verdade), canais OTA por placa, ajuda online e portal. Leitura pública,
@@ -166,7 +166,7 @@
         <tr><td>Settings · OTA</td><td><code>/updates/&lt;canal&gt;/update.json</code> → <code>firmware.bin</code></td><td>OTA v2 (api_version, variant)</td></tr>
         <tr><td>Ajuda</td><td><code>/help/index.json</code> → categoria → artigo</td><td>texto puro sem acentos</td></tr>
         <tr><td>Portal (navegador)</td><td><code>/store/all.json</code>, <code>/api/info</code>, <code>/help/*</code></td><td>só leitura</td></tr>
-        <tr><td>CI / dev</td><td><code>POST /admin/*</code> com <code>Authorization: Bearer</code></td><td>escopos <code>apps</code>/<code>updates</code>/<code>*</code></td></tr>
+        <tr><td>CI / dev</td><td><code>POST /admin/*</code> com <code>Authorization: Bearer</code></td><td>escopos <code>apps</code>/<code>updates</code>/<code>deps</code>/<code>*</code></td></tr>
       </tbody>
     </table></div>
     <p>Cada contrato tem página própria: <a href="loja.html">loja</a>,
@@ -174,12 +174,13 @@
 
     <h2 id="numeros">O ecossistema em números <a class="hash" href="#numeros">#</a></h2>
     <ul>
-      <li><b>5 placas</b> com canal OTA: CYD (esp32), SmartDisplay 4848S040,
-      Waveshare AMOLED 2.06 (relógio), Spotpear ZZ-PET (cachorro) e devkit — veja
+      <li><b>6 placas</b> com canal OTA: CYD (esp32), SmartDisplay 4848S040,
+      Waveshare AMOLED 2.06 (relógio), Spotpear ZZ-PET (cachorro),
+      ESP32-CAM (nó de câmera) e devkit — veja
       <a href="placas.html">a página de placas</a>.</li>
       <li><b>24 apps</b> na loja em 6 categorias</li>
       <li><b>9 artigos</b> de ajuda em 3 categorias</li>
-      <li><b>67 checks</b> de teste do hub (<code>tools/test_api.py</code>) rodando offline contra um TestClient</li>
+      <li><b>113 checks</b> de teste do hub (<code>tools/test_api.py</code>) rodando offline contra um TestClient</li>
     </ul>
   </article>
 

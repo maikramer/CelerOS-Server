@@ -52,7 +52,7 @@
     <span class="pill dim">BLE advertising flood</span>
     <span class="pill dim">msgs até 434 B</span>
     <span class="pill dim">PC entra na matilha</span>
-    <span class="pill get">API 26/27</span>
+    <span class="pill get">API 26–36</span>
   </div>
 
   <article>
@@ -191,6 +191,8 @@ Pack.handoffMusic();                      // a música tocando AQUI passa pro
         <tr><td><code>Pack.me()</code> / <code>Pack.members()</code></td><td>meu papel ({speaker,mic,display,motors,leds,hub}) / o bando</td></tr>
         <tr><td><code>Pack.send(to, msg)</code> / <code>Pack.poll()</code></td><td>envelopes ≤ 430 B com dedup por msgId</td></tr>
         <tr><td><code>Pack.handoffMusic([to])</code></td><td>passa a sessão de música (to=0 escolhe o speaker mais forte)</td></tr>
+        <tr><td><code>Pack.resources([tipo])</code> <span class="pill dim">36</span></td><td>recursos expostos pelo bando: mic, speaker, câmera, dados</td></tr>
+        <tr><td><code>Pack.listen/speak/record</code> · <code>Pack.snap/view</code> <span class="pill dim">36</span></td><td>áudio remoto em stream PCM16 · fotos/vídeo do nó de câmera</td></tr>
       </tbody>
     </table></div>
 
@@ -209,6 +211,26 @@ Pack.handoffMusic();                      // a música tocando AQUI passa pro
 });
 // System.musicPos() → ms · System.musicStop() · System.musicPlaying()
 Pack.handoffMusic("Celer-AB3E");   // entrega e PARA aqui; a outra retoma</pre></div>
+
+    <h2 id="recursos">Recursos do bando <a class="hash" href="#recursos">#</a> <span class="pill get">API 36</span></h2>
+    <p>A API 36 virou o bando do lado de dentro: cada nó <b>expõe</b> o que tem —
+    microfone, alto-falante, câmera e canais de dados criados por apps — e
+    qualquer membro <b>abre</b> o recurso de outro pela malha. A sessão é um
+    <i>lease</i>: o cliente renova e o dono devolve sozinho quando ele some.
+    O áudio viaja como stream PCM16 de 16 kHz em blocos de 16 ms; a câmera
+    entrega fotos JPEG em transferência confiável (bitmap de ACK + reenvio
+    seletivo) e vídeo de baixa taxa; e os canais de dados dos apps correm no
+    <b>DataLink</b> — ESP-NOW direto no rádio WiFi, quadros de até
+    <b>1458 B</b> sem roteador. O par <b>QrNode + Bilheteria</b> (a câmera
+    lê o QR, a tela mostra a fila) é a demo E2E.</p>
+    <div class="code"><div class="code-head"><span class="dot">▸</span>main.js — o recurso do vizinho</div><pre>var cams = Pack.resources("camera");     // [{node, nodeName, name, type, busy…}]
+
+var h = Pack.listen("Celer-Watch");      // o speaker DAQUI toca o mic do relógio
+Pack.speak("Celer-Display", "bem-vindo!"); // o mic DAQUI toca no speaker do outro
+
+Pack.snap("Celer-CAM", {path: "/local/snap.jpg"});  // foto JPEG do no de camera
+var v = Pack.view("Celer-CAM", {fps: 2});           // video de baixa taxa
+while (Pack.pollWrite()) {}             // canais de dados do app (DataLink)</pre></div>
 
     <h2 id="celerlink">CelerLink — o par-a-par <a class="hash" href="#celerlink">#</a></h2>
     <p>Enquanto a CelerNet é gritaria em advertising, o <b>CelerLink</b> é a conversa

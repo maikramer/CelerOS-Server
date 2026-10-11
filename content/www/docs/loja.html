@@ -163,7 +163,7 @@ if (okDL && md5File(ftmp) === fe.md5) renameOK.push(ftmp, fe.dest);
         <tr><td><code>version</code></td><td>semver <code>x.y.z</code>; publish exige &gt; que a atual</td><td>autor</td></tr>
         <tr><td><code>api</code></td><td>int, nível mínimo de firmware (default 1)</td><td>autor</td></tr>
         <tr><td><code>category</code></td><td>default <code>Apps</code> — vira categoria da loja</td><td>autor</td></tr>
-        <tr><td><code>requires</code></td><td>⊂ <code>["psram"]</code> — libera main.js até 128 KB</td><td>autor</td></tr>
+        <tr><td><code>requires</code></td><td>⊂ <code>["psram"]</code> — libera a soma dos .js até 1 MB</td><td>autor</td></tr>
         <tr><td><code>permissions</code></td><td><code>fs</code> <code>net</code> <code>gpio</code> <code>system</code> — consentimento no device</td><td>autor</td></tr>
         <tr><td><code>changelog</code></td><td>texto; o card "novidades" mostra</td><td>autor</td></tr>
         <tr><td><code>size</code> <code>md5</code> <code>published_at</code> <code>publisher</code> <code>files</code></td><td>recomputados no publish</td><td class="pill warn">hub — nunca setar à mão</td></tr>

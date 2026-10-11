@@ -38,7 +38,7 @@
   <p class="sub">Loja de apps com <strong>atualização pela App Store</strong>, updates
   <strong>OTA</strong> e central de ajuda para o CelerOS — o sistema para ESP32 com
   runtime JavaScript, IA e voz no dispositivo. Tudo em um lugar, servido
-  direto para CYD, SmartDisplay 4&rdquo;, relógio, cão robô e devkit.</p>
+  direto para CYD, SmartDisplay 4&rdquo;, relógio, cão robô, nó de câmera e devkit.</p>
   <div class="chips" id="hero-chips">
     <span class="chip">os.celer.tec.br</span>
     <span class="chip" id="chip-apps">…</span>
@@ -113,7 +113,7 @@
 <section id="celeros" class="card">
   <div class="card-head">
     <h2>O CelerOS</h2>
-    <span class="pill">firmware 1.8.2 · API 32</span>
+    <span class="pill">firmware 1.8.2 · API 36</span>
   </div>
   <p class="muted">Sistema operacional com GUI e runtime de apps JavaScript
   para ESP32 — fork (GPL-3.0) do
@@ -128,11 +128,13 @@
     </div>
     <div class="feat">
       <h3>Jogos de verdade</h3>
-      <p>Canvas nativo com pool de sprites, física verlet em C++ e efeitos
-      sonoros misturados na trilha (<code>System.sfx</code>):
-      <strong>Supernova</strong> e o <strong>Detona!</strong> — com duelo
-      1×1 pela matilha — rodam nessa stack, sobre libs compartilhadas do
-      hub (engine, física, SFX, grid).</p>
+      <p>Canvas nativo com pool de sprites e <code>System.blitSprite</code>,
+      física em C++ (verlet e corpo rígido) e efeitos misturados na trilha
+      (<code>System.sfx</code>). A família <strong>CelerGame</strong> — engine,
+      fx, sprites e tilemap como deps compartilhadas do hub — carrega a
+      rodada de jogos: 2048, Breakout, Campo Minado, Tic Tac Toe, Neon
+      Surfer, Physics Drop, Arrasa, <strong>Supernova</strong> e o
+      <strong>Detona!</strong> com duelo 1×1 pela matilha.</p>
     </div>
     <div class="feat">
       <h3>IA no dispositivo</h3>
@@ -175,7 +177,7 @@
 <section id="matilha" class="card">
   <div class="card-head">
     <h2>Matilha — a rede entre as placas</h2>
-    <span class="pill">CelerNet · API 26/27</span>
+    <span class="pill">CelerNet · API 26–36</span>
   </div>
   <div class="mesh-hero">
     <figure class="mesh-shot">
@@ -212,6 +214,13 @@
       <p><code>System.playMusic</code> sintetiza até 4 trilhas na placa e
       <code>Pack.handoffMusic()</code> passa a sessão inteira — posição em ms
       inclusa — pro vizinho com o speaker mais forte.</p>
+    </div>
+    <div class="feat">
+      <h3>Recursos do bando</h3>
+      <p>API 36: cada nó expõe o que tem — mic, alto-falante, câmera e
+      canais de dados — e qualquer membro abre o recurso do outro
+      (<code>Pack.listen/speak/snap</code>), com DataLink ESP-NOW de até
+      1458 B sem roteador.</p>
     </div>
     <div class="feat">
       <h3>Apps da matilha</h3>
@@ -251,7 +260,7 @@ python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
   --hub https://os.celer.tec.br --token $CELER_HUB_TOKEN
 
 # canais: esp32 | smartdisplay_4848S040 | waveshare_amoled206 |
-#         spotpear_zzpet | devkit      (default --api-version: a atual)</code></pre>
+#         spotpear_zzpet | esp32-cam | devkit   (default --api-version: a atual)</code></pre>
   <p>Contrato do <code>app.json</code> (API atual do sistema:
   <strong id="devs-api-inline">…</strong>):</p>
   <pre><code>{
@@ -262,18 +271,22 @@ python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
   "description": "sem acentos: a fonte do dispositivo nao tem.",
   "category": "Utilidades",
   "api": 6,                      // minimo de API do firmware p/ rodar
-  "requires": [],                // "psram": libera main.js ate 128 KB
+  "requires": [],                // "psram": libera a soma dos .js ate 1 MB
+  "deps": {},                    // deps compartilhadas: {"celeros.game": "^1.0.0"}
   "changelog": "1.0.0 - primeiro lancamento"
 }
 
 // campos gerenciados pelo hub (gravados no publish, nao edite):
 // "size", "md5", "published_at", "publisher", "files"</code></pre>
   <p class="muted">Regras da loja: soma dos <code>.js</code> até
-  <strong>48 KB</strong> — <strong>128 KB</strong> declarando
+  <strong>48 KB</strong> — <strong>1 MB</strong> declarando
   <code>"psram"</code> em <code>requires</code> — cada arquivo acima de
   <strong>30 KB</strong> precisa de <code>api: 6</code> (firmware antigo
   truncava o download), <code>icon.png</code> até <strong>16 KB</strong> e
-  assets somando até <strong>256 KB</strong>. Quem publica primeiro um
+  assets somando até <strong>256 KB</strong>. As deps de
+  <code>"deps"</code> entram na mesma soma (o device compila cada uma no
+  heap do app) e são baixadas do repositório do hub
+  (<code>/store/deps.json</code>). Quem publica primeiro um
   <code>packageName</code> vira o <strong>dono</strong> — só o dono (ou o hub)
   atualiza/remove. Versão nova tem que ser <strong>maior</strong> que a
   publicada; republicar a mesma exige <code>--force</code>. O device valida o
@@ -285,13 +298,16 @@ python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
   <code>api_version</code>, validado pelo hub contra o nível atual.</p>
   <p class="muted">Endpoints: <code>GET /store/index.json</code> ·
   <code>GET /store/all.json</code> ·
+  <code>GET /store/deps.json</code> ·
   <code>GET /store/apps/&lt;pkg&gt;/main.js</code> ·
   <code>GET /api/info</code> · <code>GET /health</code> ·
   <code>POST /admin/apps</code> · <code>DELETE /admin/apps/&lt;pkg&gt;</code> ·
+  <code>POST /admin/deps</code> ·
+  <code>DELETE /admin/deps/&lt;nome&gt;/&lt;versão&gt;</code> ·
   <code>POST /admin/updates/&lt;canal&gt;</code> ·
   <code>DELETE /admin/updates/&lt;canal&gt;</code>
   (admin: <code>Authorization: Bearer &lt;token&gt;</code> com escopo
-  <code>apps</code> ou <code>updates</code>).</p>
+  <code>apps</code>, <code>deps</code> ou <code>updates</code>).</p>
 </section>
 
 </main>
