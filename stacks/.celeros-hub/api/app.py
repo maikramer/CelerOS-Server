@@ -23,12 +23,18 @@
 #   - uploads: teto de tamanho (request e descomprimido), whitelist de
 #     arquivos do zip, checagem de PNG, packageName/semver/canal validados.
 #   - apps: publish calcula os campos gerenciados (size, md5, published_at,
-#     publisher) e grava no app.json; rejeita main.js > 30 KB (o device
-#     trunca em 32 KB), versao <= atual (anti-downgrade; force=1 excecao) e
-#     republicacao/remocao por nao-dono, api acima de FIRMWARE_API_LEVEL e
-#     NOME de exibicao repetido entre pacotes (force=1 excecao). Downloads
-#     de main.js e das deps sao contados em STATS_DIR/downloads.json (no
-#     volume NFS em producao) e expostos em /api/info.
+#     publisher, files, zip) e grava no app.json; rejeita soma dos .js acima
+#     do teto (48 KB; 1 MB com requires psram; .js individual > 30 KB exige
+#     api >= 6 — firmware antigo trunca o download), versao <= atual
+#     (anti-downgrade; force=1 excecao) e republicacao/remocao por nao-dono,
+#     api acima de FIRMWARE_API_LEVEL e NOME de exibicao repetido entre
+#     pacotes (force=1 excecao). PACOTE UNICO (API 42): o publish tambem
+#     constroi o app.zip da pasta (flat, app.json na raiz, timestamps fixos
+#     = md5 reproduzivel) e o catalogo publica zip = {url, size, md5} — a
+#     loja com System.installZip instala em 1 download; extras aceitos:
+#     .js .png .wav .qoa .json .bin .sh (install.sh, API 42). Downloads de
+#     main.js, app.zip e das deps sao contados em STATS_DIR/downloads.json
+#     (no volume NFS em producao) e expostos em /api/info.
 #   - deps: repositorio de dependencias JS compartilhadas entre apps (a game
 #     engine/fisica, ~53KB que antes eram vendorizados por jogo). App declara
 #     "deps" {nome: "^x.y.z"} no app.json; o publish valida nome/range/existe
@@ -65,7 +71,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.9.3"
+HUB_VERSION = "0.10.0"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -85,8 +91,19 @@ HUB_VERSION = "0.9.3"
 # 36 = recursos do bando (Pack.resources/open, listen/speak/record, snap/
 # view/drawFrame, canais de dados): mic, speaker, camera e dados pela
 # malha (DataLink ESP-NOW, quadros de ate 1458 B sem roteador).
+# 37 = CelerNet v3: matilha PRIVADA por nome+senha (PBKDF2+HKDF, quadro
+# cifrado AES-CCM com anti-replay; junto da aberta "celer").
+# 38 = recursos genericos na matilha: reles/gpio (TYPE_GPIO, exclusivo) e
+# leituras de placa (TYPE_SENSOR: LDR, bateria) com catalogo de metadados.
+# 39 = gateway de recursos USB: o PC abre recursos da matilha pelo cabo.
+# 40 = entrar na matilha pelo cabo (convite sem tela, bond dispensa codigo).
+# 41 = o PC como no VIRTUAL da matilha (celerctl mesh; o HCI cru saiu).
+# 42 = svchost (servicos JS em segundo plano, campo "service" no app.json,
+# install.sh roda 1x por versao no sh restrito) + pacote unico do app:
+# System.installZip Troca /local/apps/<nome> inteiro (tetos 272 KB/arquivo,
+# 448 KB total, 64 entradas; app.json na raiz) — o hub publica it.zip.
 # Tambem e o TETO do publish de apps: api acima disto nenhum firmware roda.
-FIRMWARE_API_LEVEL = 36
+FIRMWARE_API_LEVEL = 42
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
@@ -152,8 +169,10 @@ STREAM_SAFE_MAIN_JS = 30 * 1024
 # nao passam pelo Duktape, custam so espaco em disco. O publish computa o
 # campo gerenciado "files" {nome: {size, md5}} (viaja no app.json e no
 # catalogo) para a loja instalar e verificar tudo. Mesmo contrato do
-# celerhub.py.
-ASSET_EXTS = (".js", ".png", ".wav", ".json", ".bin")
+# celerhub.py. Desde a API 42 ha tambem install.sh (roda 1x por versao no
+# sh restrito do Installer — NAO e compilado pelo Duktape, e asset) e o
+# audio QOA (.qoa) na whitelist do celerhub.
+ASSET_EXTS = (".js", ".png", ".wav", ".qoa", ".json", ".bin", ".sh")
 FILE_NAME = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 MAX_ASSET_FILE = 128 * 1024    # por arquivo extra
 MAX_ASSETS_TOTAL = 256 * 1024  # soma dos extras nao-.js
@@ -528,6 +547,16 @@ def catalog_categories() -> dict[str, dict]:
         # deps.json resolvido na pasta do app; clientes antigos ignoram.
         if meta.get("deps"):
             entry["deps"] = meta["deps"]
+        # Pacote unico (API 42): a loja com System.installZip baixa 1 blob
+        # (md5 conferido no FS) e troca /local/apps/<nome> inteiro de uma
+        # vez; firmware antigo ignora o campo e cai no caminho por arquivo.
+        # A url e composta AQUI (BASE_URL do servidor em execucao — mesmo
+        # principio das urls meta/app; nada de absoluta assada no app.json).
+        zmeta = meta.get("zip")
+        if isinstance(zmeta, dict) and zmeta.get("md5"):
+            entry["zip"] = {"url": f"{BASE_URL}/store/apps/{pkg}/app.zip",
+                            "size": int(zmeta.get("size") or 0),
+                            "md5": str(zmeta["md5"])}
         if (apps_root / pkg / "icon.png").exists():
             entry["icon"] = f"{BASE_URL}/store/apps/{pkg}/icon.png"
         n_down = _load_stats().get(pkg, 0)
@@ -622,6 +651,21 @@ def download_app_js(pkg: str):
         raise HTTPException(404, "pacote nao encontrado")
     _count_download(pkg)
     return FileResponse(f, media_type="text/javascript",
+                        headers={"cache-control": "no-cache"})
+
+
+@app.get("/store/apps/{pkg}/app.zip")
+def download_app_zip(pkg: str):
+    """Pacote unico (API 42) com contagem — mesmo modelo do main.js: rota na
+    frente do mount estatico, cache-control no-cache (o md5 do catalogo e a
+    revalidacao barata; o device nunca instala zip stale)."""
+    if not PKG_NAME.match(pkg):
+        raise HTTPException(404, "pacote nao encontrado")
+    f = CONTENT_DIR / "store" / "apps" / pkg / "app.zip"
+    if not f.is_file():
+        raise HTTPException(404, "pacote sem pacote unico (firmware antigo)")
+    _count_download(pkg)
+    return FileResponse(f, media_type="application/zip",
                         headers={"cache-control": "no-cache"})
 
 
@@ -760,6 +804,38 @@ def _body_too_big(request: Request) -> bool:
         return False
 
 
+# timestamp fixo do app.zip: build reproduzivel (mesmo conteudo = mesmo md5,
+# republish nao invalida o cache do device a toa).
+_ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
+def _build_app_zip(meta: dict, main_js: bytes, icon: bytes | None,
+                   extras: dict[str, bytes]) -> bytes:
+    """app.zip do pacote unico (API 42): flat, app.json na raiz — o layout
+    que o System.installZip descompacta em /local/apps/<nome>.
+
+    O app.json DE DENTRO nao carrega o campo "zip" (o md5 do zip nao pode
+    estar dentro do proprio zip); a loja le url/size/md5 do CATALOGO, e o
+    app.json de disco (que o catalogo escaneia) guarda os valores. O
+    aparelho instalado nao precisa do campo — a loja compara versoes pelo
+    app.json do catalogo."""
+    inner = {k: v for k, v in meta.items() if k != "zip"}
+    blobs = {"app.json": (json.dumps(inner, ensure_ascii=False, indent=2)
+                          + "\n").encode("utf-8"),
+             "main.js": main_js}
+    if icon is not None:
+        blobs["icon.png"] = icon
+    blobs.update(extras)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in sorted(blobs):
+            zi = zipfile.ZipInfo(name, date_time=_ZIP_EPOCH)
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o644 << 16
+            zf.writestr(zi, blobs[name])
+    return buf.getvalue()
+
+
 @app.post("/admin/apps")
 async def publish_app(request: Request,
                       file: UploadFile = File(...),
@@ -885,11 +961,20 @@ async def publish_app(request: Request,
                          for n, b in sorted(extras.items())}
     else:
         meta.pop("files", None)
+    # Pacote unico (API 42): o hub serve o app.zip da pasta e o catalogo
+    # publica zip = {url, size, md5} — a loja com System.installZip baixa 1
+    # blob verificado e troca a pasta inteira de uma vez (firmware antigo
+    # ignora o campo e cai no caminho por arquivo). Apps acima dos tetos do
+    # installZip (448 KB total) seguem publicaveis: o device recusa o zip e
+    # a loja faz o fallback por arquivo.
+    zip_blob = _build_app_zip(meta, main_blob, files.get("icon.png"), extras)
+    meta["zip"] = {"size": len(zip_blob), "md5": hashlib.md5(zip_blob).hexdigest()}
     (staging / "main.js").write_bytes(main_blob)
     if "icon.png" in files:
         (staging / "icon.png").write_bytes(files["icon.png"])
     for n, b in extras.items():
         (staging / n).write_bytes(b)
+    (staging / "app.zip").write_bytes(zip_blob)
     (staging / "app.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if not (staging / "app.json").exists() or not (staging / "main.js").exists():
@@ -901,6 +986,7 @@ async def publish_app(request: Request,
     audit(request, agent, "app:publicar", f"{pkg}@{meta.get('version')}")
     return {"ok": True, "package": pkg, "version": meta.get("version"),
             "md5": meta["md5"], "size": meta["size"],
+            "zip": meta["zip"],
             "store": {"apps": len(scan_apps())}}
 
 

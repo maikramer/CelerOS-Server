@@ -199,6 +199,59 @@ def main() -> None:
             expect((Path(os.environ["STATS_DIR"]) / "downloads.json").is_file(),
                    "contador persistido em STATS_DIR")
 
+            print("pacote unico (API 42): app.zip + catalogo")
+            z = entry.get("zip") or {}
+            expect(bool(z.get("url", "").endswith(
+                "/store/apps/celeros.testapp/app.zip")) and
+                z.get("size", 0) > 0 and bool(z.get("md5")),
+                "entry traz zip {url, size, md5} com url relativa ao BASE_URL")
+            disk_zip = content / "store/apps/celeros.testapp/app.zip"
+            expect(disk_zip.is_file() and
+                   hashlib.md5(disk_zip.read_bytes()).hexdigest() == z["md5"],
+                   "app.zip em disco bate com o md5 do catalogo")
+            rz = c.get("/store/apps/celeros.testapp/app.zip")
+            expect(rz.status_code == 200 and
+                   rz.headers["content-type"] == "application/zip" and
+                   hashlib.md5(rz.content).hexdigest() == z["md5"],
+                   "GET app.zip 200, zip e md5 confere")
+            expect(c.get("/api/info").json()["downloads"]
+                   .get("celeros.testapp") == 3, "download do app.zip conta")
+            with zipfile.ZipFile(io.BytesIO(rz.content)) as zf:
+                names = sorted(zf.namelist())
+                inner = json.loads(zf.read("app.json"))
+            expect(names == ["app.json", "icon.png", "main.js"],
+                   "zip flat com app.json na raiz (+icon/main)")
+            expect("zip" not in inner and inner.get("md5") == disk["md5"],
+                   "app.json DE DENTRO do zip nao carrega o campo zip")
+            md5_v1 = z["md5"]
+            publish(c, "tok-dev1", meta_of("celeros.testapp", "1.1.0"))
+            z2 = (c.get("/store/all.json").json()["apps"]
+                  ["celeros.testapp"].get("zip") or {})
+            # published_at entra no zip: conteudo muda entre versoes — o que
+            # NAO muda e o mesmo upload republishado com force (timestamp
+            # fixo no ZipInfo, nao do relogio do servidor)
+            expect(z2.get("md5") != md5_v1 and z2.get("size", 0) > 0,
+                   "nova versao gera novo zip no catalogo")
+
+            print("extensoes novas: install.sh (API 42) e .qoa")
+            r = publish(c, "tok-dev1", meta_of("celeros.svcapp"),
+                        main_js=b"exports.run = 1;\n",
+                        extras={"install.sh": b"mkdir -p /local/data/app\n",
+                                "service.js": b"function onTick() {}\n",
+                                "beep.qoa": b"qoaf" + b"0" * 64})
+            expect(r.status_code == 200, f"publish com install.sh/.qoa 200 "
+                   f"(veio {r.status_code}: {r.text[:120]})")
+            sentry = c.get("/store/all.json").json()["apps"]["celeros.svcapp"]
+            expect(sorted((sentry.get("files") or {}).keys()) ==
+                   ["beep.qoa", "install.sh", "service.js"],
+                   "manifesto files traz install.sh/service.js/beep.qoa")
+            with zipfile.ZipFile(io.BytesIO(
+                    c.get("/store/apps/celeros.svcapp/app.zip").content)) as zf:
+                snames = sorted(zf.namelist())
+            expect(snames == ["app.json", "beep.qoa", "install.sh",
+                              "main.js", "service.js"],
+                   "app.zip embala os extras novos (layout do installZip)")
+
             print("anti-downgrade / republicacao")
             expect(publish(c, "tok-dev1",
                            meta_of("celeros.testapp")).status_code == 409,

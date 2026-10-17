@@ -110,7 +110,7 @@ python3 tools/publish_firmware.py smartdisplay-y build-y/CelerOS.bin \
 ```
 
 O `--api-version` do firmware tem default no hub (o nível atual, `FIRMWARE_API_LEVEL`
-em `api/app.py` — hoje 36, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
+em `api/app.py` — hoje 42, espelhando o `CELEROS_API_LEVEL` do CelerOS): o
 dispositivo **recusa** manifest sem `api_version` ou abaixo do nível dele. O
 mesmo nível é o **teto** do publish de apps: `api` acima dele nenhum firmware
 roda (400). Ao subir a API no firmware, suba aqui junto (hub novo + deploy).
@@ -209,7 +209,12 @@ um token — útil no CI.
   `{categories:{nome:url}}` → categoria `{apps:{id:{meta,app,api}}}` →
   `app.json` `{packageName,name,description,author,version,api}`. Campos
   extras (name/version/author/... na entrada) são ignorados pelo cliente e
-  usados pelo portal.
+  usados pelo portal. Desde a API 42 o publish também constrói o
+  **app.zip do pacote único** (flat, app.json na raiz, md5 reproduzível) e o
+  catálogo publica `zip {url,size,md5}`: a loja com `System.installZip`
+  instala em 1 download com troca atômica da pasta (fallback por arquivo em
+  firmware antigo). Extras aceitos: `.js .png .wav .qoa .json .bin .sh`
+  (`install.sh` roda 1× por versão no shell restrito do Installer).
 - **OTA v2** (cliente: `main/OTA/OtaManager.cpp`): `update.json` com
   `version`, `api_version` (validada pelo hub: 1..999, default = nível atual
   — o device **recusa** manifest abaixo do próprio nível), flags
@@ -229,7 +234,7 @@ um token — útil no CI.
   canais; `/health` e `/api/info` (consumidos pelo denv).
 - Publish de app e firmware via CLI (multipart), DELETE de app/canal, 403 sem
   token, atomicidade do `firmware.bin` (write→rename).
-- `tools/test_api.py`: 113 checks via TestClient (apps, multi-arquivo, limites,
+- `tools/test_api.py`: 123 checks via TestClient (apps, multi-arquivo, limites,
   nível de API e nome único, downloads de app e dep, deps, OTA —
   api_version/variant/anti-rollback).
 - Portal renderizado e conferido no navegador (loja/placas/firmware/CelerOS/
