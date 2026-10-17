@@ -113,7 +113,7 @@
 <section id="celeros" class="card">
   <div class="card-head">
     <h2>O CelerOS</h2>
-    <span class="pill">firmware 1.8.2 · API 36</span>
+    <span class="pill">firmware 1.9.0 · API 42</span>
   </div>
   <p class="muted">Sistema operacional com GUI e runtime de apps JavaScript
   para ESP32 — fork (GPL-3.0) do
@@ -177,7 +177,7 @@
 <section id="matilha" class="card">
   <div class="card-head">
     <h2>Matilha — a rede entre as placas</h2>
-    <span class="pill">CelerNet · API 26–36</span>
+    <span class="pill">CelerNet · API 26–42</span>
   </div>
   <div class="mesh-hero">
     <figure class="mesh-shot">
@@ -217,10 +217,10 @@
     </div>
     <div class="feat">
       <h3>Recursos do bando</h3>
-      <p>API 36: cada nó expõe o que tem — mic, alto-falante, câmera e
-      canais de dados — e qualquer membro abre o recurso do outro
-      (<code>Pack.listen/speak/snap</code>), com DataLink ESP-NOW de até
-      1458 B sem roteador.</p>
+      <p>Cada nó expõe o que tem — mic, alto-falante, câmera, canais de
+      dados (<code>Pack.listen/speak/snap</code>, DataLink ESP-NOW de até
+      1458 B) e, da API 38, relés/GPIO e sensores — e o PC entra no bando
+      pelo cabo como nó virtual (API 39–41, <code>celerctl mesh</code>).</p>
     </div>
     <div class="feat">
       <h3>Apps da matilha</h3>
@@ -247,8 +247,10 @@
     <span class="pill" id="devs-api">API …</span>
   </div>
   <p>Um app é uma pasta com <code>app.json</code>, <code>main.js</code> e
-  (opcional) <code>icon.png</code> (PNG 64×64) — mais módulos
-  <code>.js</code> e assets (<code>.png .wav .json .bin</code>, até 16 extras).
+  (opcional) <code>icon.png</code> (PNG 64x64) — mais módulos
+  <code>.js</code>, <code>service.js</code> (serviço em segundo plano,
+  API 42), <code>install.sh</code> (roda 1× por versão) e assets
+  (<code>.png .wav .qoa .json .bin .sh</code>, até 16 extras).
   Empacote e publique com a CLI do repo do hub:</p>
   <pre><code># app (zip com app.json + main.js [+ icon.png] [+ extras])
 python3 tools/publish_app.py minha-pasta-do-app \
@@ -277,7 +279,9 @@ python3 tools/publish_firmware.py esp32 build-cyd/CelerOS.bin \
 }
 
 // campos gerenciados pelo hub (gravados no publish, nao edite):
-// "size", "md5", "published_at", "publisher", "files"</code></pre>
+// "size", "md5", "published_at", "publisher", "files", "zip"
+// ("zip" = pacote unico da API 42: o publish gera o app.zip e o catalogo
+//  publica zip {url,size,md5} — System.installZip instala em 1 download)</code></pre>
   <p class="muted">Regras da loja: soma dos <code>.js</code> até
   <strong>48 KB</strong> — <strong>1 MB</strong> declarando
   <code>"psram"</code> em <code>requires</code> — cada arquivo acima de

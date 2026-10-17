@@ -52,7 +52,7 @@
     <span class="pill dim">BLE advertising flood</span>
     <span class="pill dim">msgs até 434 B</span>
     <span class="pill dim">PC entra na matilha</span>
-    <span class="pill get">API 26–36</span>
+    <span class="pill get">API 26–42</span>
   </div>
 
   <article>
@@ -161,7 +161,12 @@ FRAG = fragmento  → [idx|cópia][total][chunk ≤14 B]  · mensagem máxima 43
     <h2 id="api">A API no JavaScript <a class="hash" href="#api">#</a></h2>
     <p>Duas camadas: <code>CelerNet.*</code> (transporte cru, API 26/27) e <code>Pack.*</code>
     (a matilha com papéis e envelopes, API 27). Só existe em placa com BLE — detecte com
-    <code>typeof CelerNet !== "undefined"</code>.</p>
+    <code>typeof CelerNet !== "undefined"</code>. A API 37 trouxe a <b>matilha
+    privada</b>: rede com nome e senha, quadros cifrados AES-CCM com
+    anti-replay (convite selado pelo CelerLink, <code>mesh join</code> no
+    shell) convivendo com a aberta <code>celer</code>. E desde a API 39–41
+    <b>o PC está no bando pelo cabo</b>: gateway de recursos USB e o nó
+    virtual <code>pc-XXXX</code> via <code>celerctl mesh</code>.</p>
     <div class="code"><div class="code-head"><span class="dot">▸</span>main.js — a matilha em 12 linhas</div><pre>if (typeof CelerNet === "undefined") { /* placa sem BLE */ }
 
 CelerNet.start({});                       // entra na malha (nome/rede default)
@@ -193,6 +198,8 @@ Pack.handoffMusic();                      // a música tocando AQUI passa pro
         <tr><td><code>Pack.handoffMusic([to])</code></td><td>passa a sessão de música (to=0 escolhe o speaker mais forte)</td></tr>
         <tr><td><code>Pack.resources([tipo])</code> <span class="pill dim">36</span></td><td>recursos expostos pelo bando: mic, speaker, câmera, dados</td></tr>
         <tr><td><code>Pack.listen/speak/record</code> · <code>Pack.snap/view</code> <span class="pill dim">36</span></td><td>áudio remoto em stream PCM16 · fotos/vídeo do nó de câmera</td></tr>
+        <tr><td>recursos <code>gpio</code> / <code>sensor</code> <span class="pill dim">38</span></td><td>relés do perfil e leituras de placa (LDR, bateria) como recursos — catálogo com <code>unit/min/max</code></td></tr>
+        <tr><td>matilha privada <span class="pill dim">37</span> · PC no bando <span class="pill dim">39–41</span></td><td>nome+senha com AES-CCM/anti-replay · <code>celerctl mesh</code> vira nó virtual pelo cabo</td></tr>
       </tbody>
     </table></div>
 
@@ -212,10 +219,15 @@ Pack.handoffMusic();                      // a música tocando AQUI passa pro
 // System.musicPos() → ms · System.musicStop() · System.musicPlaying()
 Pack.handoffMusic("Celer-AB3E");   // entrega e PARA aqui; a outra retoma</pre></div>
 
-    <h2 id="recursos">Recursos do bando <a class="hash" href="#recursos">#</a> <span class="pill get">API 36</span></h2>
+    <h2 id="recursos">Recursos do bando <a class="hash" href="#recursos">#</a> <span class="pill get">API 36–42</span></h2>
     <p>A API 36 virou o bando do lado de dentro: cada nó <b>expõe</b> o que tem —
     microfone, alto-falante, câmera e canais de dados criados por apps — e
-    qualquer membro <b>abre</b> o recurso de outro pela malha. A sessão é um
+    qualquer membro <b>abre</b> o recurso de outro pela malha. A API 38
+    generalizou: <b>relés/GPIO</b> do perfil (atuador exclusivo, sessão
+    revogada pelo uso local) e <b>sensores</b> de placa (LDR, bateria) com
+    catálogo de metadados (<code>unit/min/max</code>); a 39–41 colocou o
+    <b>PC no bando pelo cabo</b> (gateway USB, nó virtual <code>pc-XXXX</code>).
+    A sessão é um
     <i>lease</i>: o cliente renova e o dono devolve sozinho quando ele some.
     O áudio viaja como stream PCM16 de 16 kHz em blocos de 16 ms; a câmera
     entrega fotos JPEG em transferência confiável (bitmap de ACK + reenvio

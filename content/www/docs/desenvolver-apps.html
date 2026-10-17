@@ -135,7 +135,8 @@ while (true) {
         <tr><td>qualquer .js individual &gt; 30 KB</td><td>exige <code>api ≥ 6</code> (truncamento em fw antigo)</td><td>400</td></tr>
         <tr><td><code>icon.png</code></td><td>≤ 16 KB + magic bytes PNG</td><td>400 / 413</td></tr>
         <tr><td>extras (multi-arquivo)</td><td>≤ 16 arquivos, ≤ 128 KB cada, ≤ 256 KB somados</td><td>400 / 413</td></tr>
-        <tr><td>extensões de extras</td><td>.js .png .wav .json .bin</td><td>400</td></tr>
+        <tr><td>extensões de extras</td><td>.js .png .wav .qoa .json .bin .sh</td><td>400</td></tr>
+        <tr><td>pacote único <span class="pill dim">API 42</span></td><td>hub gera <code>app.zip</code> (flat, md5 no catálogo) — <code>System.installZip</code> instala em 1 download (tetos no device: 272 KB/arquivo, 448 KB total, 64 entradas)</td><td>automático</td></tr>
         <tr><td>zip inteiro (payload)</td><td>≤ 48 MB comprimido / 64 MB descomprimido</td><td>413</td></tr>
         <tr><td><code>version</code> nova</td><td>sempre &gt; que a atual do pacote (ou <code>force=1</code>)</td><td>409</td></tr>
       </tbody>

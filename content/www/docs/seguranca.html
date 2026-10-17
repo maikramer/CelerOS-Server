@@ -109,7 +109,7 @@ curl -s -H "Authorization: Bearer $T" https://os.celer.tec.br/admin/whoami
       <tbody>
         <tr><td>Tetos de tamanho</td><td>body ≤ 49 MB, zip lido ≤ 48 MB, <b>soma descomprimida ≤ 64 MB</b> (zip-bomb)</td></tr>
         <tr><td>Nomes de arquivo</td><td>regex <code>^[A-Za-z0-9._-]{1,64}$</code>, colisão de basename → 400 — <b>sem path traversal</b></td></tr>
-        <tr><td>Whitelist de extras</td><td>só .js .png .wav .json .bin; ≤ 16 arquivos / 128 KB cada / 256 KB total</td></tr>
+        <tr><td>Whitelist de extras</td><td>só .js .png .wav .qoa .json .bin .sh; ≤ 16 arquivos / 128 KB cada / 256 KB total</td></tr>
         <tr><td>Ícone</td><td>magic bytes PNG + ≤ 16 KB</td></tr>
         <tr><td>Metadados</td><td>packageName/semver/canal validados por regex; <code>requires</code> ⊆ psram</td></tr>
         <tr><td>Escrita</td><td>staging <code>&lt;pkg&gt;.tmp</code> + swap rmtree/rename — nunca meio pacote no ar</td></tr>
