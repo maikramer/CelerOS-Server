@@ -71,7 +71,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.11.0"
+HUB_VERSION = "0.12.0"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -103,7 +103,9 @@ HUB_VERSION = "0.11.0"
 # System.installZip Troca /local/apps/<nome> inteiro (tetos 272 KB/arquivo,
 # 448 KB total, 64 entradas; app.json na raiz) — o hub publica it.zip.
 # Tambem e o TETO do publish de apps: api acima disto nenhum firmware roda.
-FIRMWARE_API_LEVEL = 42
+# 43 = multitouch (System.getTouches/injetor; Touch Test).
+# 44 = nivel do main no bump (Lenda de Celer 1.0.4; bancada 4848 ja roda).
+FIRMWARE_API_LEVEL = 44
 # Placas do firmware (main/Boards/<placa>/Board.cpp -> otaChannel). Serve o
 # portal (/api/info) com nomes amigaveis; o hub NAO restringe canais —
 # canais beta/extra seguem publicaveis.
