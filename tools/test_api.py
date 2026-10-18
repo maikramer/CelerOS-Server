@@ -448,6 +448,17 @@ def main() -> None:
                    .get("celeros.engine") == 1, "download de dep contado em dep_downloads")
             expect("dep:celeros.engine" not in c.get("/api/info").json()["downloads"],
                    "dep nao polui o contador de apps")
+            idx2 = c.get("/store/deps.json").json()
+            expect(idx2.get("latest", {}).get("celeros.engine") == "1.0.0",
+                   "indice traz latest {nome: maior versao}")
+            expect(idx2.get("downloads", {}).get("celeros.engine") == 1,
+                   "indice traz downloads por nome (dep:<nome>)")
+            publish_dep(c, "tok-lib", "celeros.engine", "1.0.5",
+                        js=b"exports.v2 = 1;\n")
+            idx3 = c.get("/store/deps.json").json()
+            expect(idx3["latest"]["celeros.engine"] == "1.0.5" and
+                   set(idx3["deps"]["celeros.engine"]) == {"1.0.0", "1.0.5"},
+                   "latest acompanha a versao nova publicada")
             expect(c.get("/store/deps/celeros.engine/1.0.0/outro.js").status_code == 404 and
                    c.get("/store/deps/celeros.engine/9.9.9/celeros.engine.js").status_code == 404,
                    "dep com arquivo/versao errados -> 404")

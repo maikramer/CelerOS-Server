@@ -215,6 +215,12 @@ um token — útil no CI.
   instala em 1 download com troca atômica da pasta (fallback por arquivo em
   firmware antigo). Extras aceitos: `.js .png .wav .qoa .json .bin .sh`
   (`install.sh` roda 1× por versão no shell restrito do Installer).
+  **Deps/engine:** o índice `/store/deps.json` traz, além das versões,
+  `latest {nome: maior versão}` e `downloads {nome: N}` (hub 0.11.0) — a
+  App Store 2.9.0 promove **atualização de engine** (range resolve mais
+  novo que o `deps.json` congelado no install) e atualiza o cache
+  `/local/modules` sem reinstalar o app; o portal tem a vitrine de deps
+  e o detalhe de app mostra a última versão dentro do range.
 - **OTA v2** (cliente: `main/OTA/OtaManager.cpp`): `update.json` com
   `version`, `api_version` (validada pelo hub: 1..999, default = nível atual
   — o device **recusa** manifest abaixo do próprio nível), flags
@@ -234,7 +240,7 @@ um token — útil no CI.
   canais; `/health` e `/api/info` (consumidos pelo denv).
 - Publish de app e firmware via CLI (multipart), DELETE de app/canal, 403 sem
   token, atomicidade do `firmware.bin` (write→rename).
-- `tools/test_api.py`: 123 checks via TestClient (apps, multi-arquivo, limites,
+- `tools/test_api.py`: 126 checks via TestClient (apps, multi-arquivo, limites,
   nível de API e nome único, downloads de app e dep, deps, OTA —
   api_version/variant/anti-rollback).
 - Portal renderizado e conferido no navegador (loja/placas/firmware/CelerOS/

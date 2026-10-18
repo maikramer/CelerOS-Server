@@ -71,7 +71,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-HUB_VERSION = "0.10.0"
+HUB_VERSION = "0.11.0"
 # Nivel de API do firmware CelerOS atual (fonte: CELEROS_API_LEVEL em
 # main/CMakeLists.txt do CelerOS). O OtaManager do dispositivo RECUSA
 # manifest sem api_version ou com nivel abaixo do dele — apps instalados
@@ -604,8 +604,14 @@ def store_deps():
     """Indice do repositorio de deps: {nome: {versao: {size, md5, minApi,
     deps, url}}}. A loja do device resolve os ranges do app.json contra
     este indice e baixa cada arquivo de url (servido pelo mount estatico).
-    Declarada ANTES de /store/{slug}.json para nao virar categoria."""
+    Declarada ANTES de /store/{slug}.json para nao virar categoria.
+
+    Desde o hub 0.11.0 traz tambem, no topo: "latest" {nome: maior versao}
+    e "downloads" {nome: N} (contador dep:<nome>) — a Loja 2.9.0 usa para
+    promover atualizacao de engine e o portal para a vitrine de deps.
+    Campos extra sao ignorados por clientes antigos."""
     out: dict[str, dict] = {}
+    latest: dict[str, str] = {}
     for name, versions in scan_deps().items():
         out[name] = {v: {"size": int(m.get("size") or 0),
                          "md5": str(m.get("md5") or ""),
@@ -613,7 +619,10 @@ def store_deps():
                          "deps": m.get("deps") or {},
                          "url": f"{BASE_URL}/store/deps/{name}/{v}/{name}.js"}
                      for v, m in versions.items()}
-    return {"updated": _deps_updated(), "deps": out}
+        latest[name] = max(versions, key=_semver_tuple)
+    stats = _load_stats()
+    return {"updated": _deps_updated(), "deps": out, "latest": latest,
+            "downloads": {n: stats.get(f"dep:{n}", 0) for n in out}}
 
 
 @app.get("/store/{slug}.json")
