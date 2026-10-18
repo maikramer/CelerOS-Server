@@ -473,28 +473,67 @@ def _pick_dep(name: str, ranges: list[str], index: dict) -> str:
     return max(ok, key=_semver_tuple)
 
 
+def _passada_fecho(sementes: dict[str, list[str]], index: dict):
+    """Uma passada do fecho: BFS semeando {nome: [ranges]}, re-escolhendo o
+    pick a cada visita; devolve (wanted, picks). O re-pick por visita e o
+    que garante "maior satisfazendo todos os caminhos" dentro da passada."""
+    wanted: dict[str, list[str]] = {}
+    seen: set[tuple[str, str]] = set()
+    queue: list[tuple[str, list[str]]] = list(sementes.items())
+    while queue:
+        name, rs = queue.pop(0)
+        novos = [r for r in rs if (name, r) not in seen]
+        if not novos:
+            continue
+        for r in novos:
+            seen.add((name, r))
+        wanted.setdefault(name, []).extend(novos)
+        pick = _pick_dep(name, wanted[name], index)
+        for d, r in (index[name][pick].get("deps") or {}).items():
+            queue.append((str(d), [str(r)]))
+    picks = {n: _pick_dep(n, rs, index) for n, rs in wanted.items()}
+    return wanted, picks
+
+
 def _resolve_app_deps(app_deps: dict) -> dict[str, str]:
     """Resolve o grafo de deps (diretas + transitivas) -> {nome: versao}.
 
-    BFS pelos ranges; um nome pode chegar por varios caminhos com ranges
-    diferentes — a versao final satisfaz todos eles. Limitacao aceita (as
-    deps oficiais nao tem transitivas): transitivas sao coletadas pela
-    versao escolhida NA PRIMEIRA visita; se um range posterior muda o pick,
-    as transitivas da nova versao nao sao re-coletadas."""
+    Ponto fixo — mesma receita do celerhub.resolve_dep_ranges (o cliente
+    oficial; vetor de conformidade no repo CelerOS, test/semver): no BFS
+    unico um range que chegava depois SUBIA o pick de um nome e as arestas
+    do pick velho vazavam — sobrava pino de versao que o pick final nem usa
+    e FALTAVA aresta que so o pick novo traz. Converge repetindo a passada
+    com diretas + arestas dos picks finais, ate os ranges que cada pick
+    exige serem EXATAMENTE os que o limitaram (pino de pick vencido nao
+    fica para tras)."""
     index = scan_deps()
-    wanted: dict[str, list[str]] = {}
-    seen: set[tuple[str, str]] = set()
-    queue: list[tuple[str, str]] = list(app_deps.items())
-    while queue:
-        name, rng = queue.pop(0)
-        if (name, rng) in seen:
-            continue  # mesmo par por outro caminho (e guard de ciclo)
-        seen.add((name, rng))
-        wanted.setdefault(name, []).append(rng)
-        pick = _pick_dep(name, wanted[name], index)
-        for d, r in (index[name][pick].get("deps") or {}).items():
-            queue.append((str(d), str(r)))
-    return {n: _pick_dep(n, rs, index) for n, rs in wanted.items()}
+    direct = {str(n): str(r) for n, r in app_deps.items()}
+    sementes = {n: [r] for n, r in direct.items()}
+    for _ in range(32):
+        wanted, picks = _passada_fecho(sementes, index)
+        exigidas: dict[str, set[str]] = {}
+        prox: dict[str, list[str]] = {}
+        for n, v in picks.items():
+            for d, r in (index[n][v].get("deps") or {}).items():
+                exigidas.setdefault(str(d), set()).add(str(r))
+                prox.setdefault(str(d), []).append(str(r))
+        exato = True
+        for n in set(wanted) | set(exigidas):
+            base = set(exigidas.get(n, set()))
+            if n in direct:
+                base.add(direct[n])
+            if sorted(wanted.get(n, [])) != sorted(base):
+                exato = False
+                break
+        if exato:
+            return picks
+        sementes = {n: list(rs) for n, rs in prox.items()}
+        for n, r in direct.items():
+            sementes.setdefault(n, [])
+            if r not in sementes[n]:
+                sementes[n].append(r)
+    raise HTTPException(400, "fecho de deps nao converge "
+                             "(ranges em briga entre versoes do grafo)")
 
 
 def catalog_categories() -> dict[str, dict]:
