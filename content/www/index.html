@@ -22,6 +22,7 @@
   </a>
   <nav>
     <a href="#loja">Loja</a>
+    <a href="#deps">Deps</a>
     <a href="#placas">Placas</a>
     <a href="#firmware">Firmware</a>
     <a href="#celeros">CelerOS</a>
@@ -79,6 +80,23 @@
 
 <section id="detalhe" class="card" hidden>
   <div id="detalhe-body"></div>
+</section>
+
+<section id="deps" class="card">
+  <div class="card-head">
+    <h2>Dependências compartilhadas</h2>
+    <span class="pill" id="deps-count">carregando…</span>
+  </div>
+  <p class="muted">O repositório de módulos JS que os apps declaram em
+  <code>"deps"</code> (a família <strong>CelerGame</strong>, física, mesh,
+  SFX…) — instalados no cache do aparelho e compartilhados entre apps. A
+  App Store <strong>2.9.0+</strong> avisa quando há <em>versão nova da
+  engine</em> dentro do range e atualiza sem reinstalar o app.</p>
+  <table class="tbl" id="deps-table">
+    <thead><tr><th>Módulo</th><th>Última</th><th>Versões</th><th>Tamanho</th>
+    <th>Downloads</th><th>Usada por</th></tr></thead>
+    <tbody></tbody>
+  </table>
 </section>
 
 <section id="placas" class="card">
@@ -328,7 +346,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g,
 
 // estado do portal: loja + info do hub (compartilhado pelas secoes)
 const store = { apps: [], downloads: {}, cat: "Todos", q: "", sort: "name" };
-const hub = { info: null };
+const hub = { info: null, deps: null };
 
 function fmtSize(n) {
   if (!n && n !== 0) return "";
@@ -426,7 +444,61 @@ async function loadStore() {
     grid.innerHTML = '<p class="muted">Catálogo indisponível.</p>';
     document.getElementById("store-count").textContent = "—";
   }
+  loadDeps();
   route();
+}
+
+// vitrine de dependencias: /store/deps.json (latest + downloads por nome,
+// hub 0.11.0) cruzado com as deps DECLARADAS pelos apps do catalogo
+function depConsumers() {
+  const byDep = {};
+  for (const a of store.apps)
+    for (const d of Object.keys(a.deps || {}))
+      (byDep[d] = byDep[d] || []).push(a);
+  return byDep;
+}
+function depInRange(rng, versions) {
+  const key = v => String(v).split(".").map(Number);
+  const ok = v => {
+    if (!String(rng).startsWith("^")) return v === rng;
+    const R = key(rng.slice(1)), V = key(v);
+    return V[0] === R[0] && (V[1] > R[1] || (V[1] === R[1] && V[2] >= R[2]));
+  };
+  return Object.keys(versions || {}).filter(ok).sort((x, y) => {
+    const A = key(x), B = key(y);
+    return (B[0]-A[0]) || (B[1]-A[1]) || (B[2]-A[2]);
+  })[0] || "";
+}
+async function loadDeps() {
+  const tbody = document.querySelector("#deps-table tbody");
+  try {
+    const doc = await (await fetch("/store/deps.json")).json();
+    hub.deps = doc;
+    const deps = doc.deps || {}, latest = doc.latest || {},
+          downs = doc.downloads || {};
+    const names = Object.keys(deps).sort();
+    const byDep = depConsumers();
+    document.getElementById("deps-count").textContent =
+      names.length + (names.length === 1 ? " módulo" : " módulos");
+    tbody.innerHTML = names.map(n => {
+      const v = latest[n] || Object.keys(deps[n])[0];
+      const meta = deps[n][v] || {};
+      const users = byDep[n] || [];
+      return `<tr>
+        <td><code>${esc(n)}</code></td>
+        <td><span class="pill">v${esc(v)}</span></td>
+        <td class="muted">${Object.keys(deps[n]).length}</td>
+        <td class="muted">${esc(fmtSize(meta.size || 0))}</td>
+        <td class="muted">${downs[n] || 0}</td>
+        <td>${users.length
+          ? `<span class="pill dim">${users.length} app${users.length === 1 ? "" : "s"}</span>`
+          : '<span class="muted">—</span>'}</td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">Nenhuma dependência publicada.</td></tr>';
+  } catch (err) {
+    document.getElementById("deps-count").textContent = "—";
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Repositório indisponível.</td></tr>';
+  }
 }
 
 function sortedApps(list) {
@@ -520,6 +592,19 @@ function renderDetail(pkg) {
            <span class="muted">— ${esc(fmtSize(f.size))} · md5
            <code>${esc(String(f.md5 || "").slice(0, 8))}…</code></span></li>`).join("")}
       </ul>` : ""}
+    ${Object.keys(a.deps || {}).length ? `
+      <h3>Dependências</h3>
+      <ul class="links">
+        ${Object.entries(a.deps).map(([n, rng]) => {
+          const inR = depInRange(rng, hub.deps?.deps?.[n]);
+          return `<li><code>${esc(n)}</code>
+           <span class="muted">${esc(rng)}</span>
+           ${inR ? `<span class="pill">v${esc(inR)}</span>`
+                 : '<span class="pill warn">indisponível no hub</span>'}</li>`;
+        }).join("")}
+      </ul>
+      <p class="muted">Versão resolvida na instalação (cache do aparelho); a
+      App Store 2.9.0+ avisa quando sair versão nova dentro do range.</p>` : ""}
     <p class="muted">Instale pelo dispositivo: <strong>App Store</strong> → toque no
     app → <em>${"Instalar"}</em>. Apps já instalados aparecem como
     <em>Atualizações (N)</em> no topo da loja.${hasPsram(a) ? " Este app pede PSRAM: em placa sem (como a CYD) a instalação é bloqueada." : ""}</p>
